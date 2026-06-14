@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Icon } from "@/components/Icon";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -20,15 +21,50 @@ type Role = "family" | "officer" | "admin";
 
 function LoginPage() {
   const navigate = useNavigate();
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [role, setRole] = useState<Role>("family");
   const [showPass, setShowPass] = useState(false);
   const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [serviceNumber, setServiceNumber] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) navigate({ to: "/dashboard" });
+    });
+  }, [navigate]);
 
   const strength = passwordStrength(password);
 
-  function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    navigate({ to: role === "family" ? "/dashboard" : "/admin" });
+    setError(null);
+    setLoading(true);
+    try {
+      if (mode === "signup") {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/dashboard`,
+            data: { full_name: fullName, service_number: serviceNumber },
+          },
+        });
+        if (error) throw error;
+        navigate({ to: "/dashboard" });
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        navigate({ to: role === "family" ? "/dashboard" : "/admin" });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Authentication failed");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -60,11 +96,12 @@ function LoginPage() {
           <div className="p-8 md:p-10">
             <div className="mb-7">
               <h2 className="text-2xl font-bold text-primary mb-1.5">
-                Secure Portal Login
+                {mode === "signup" ? "Create Portal Account" : "Secure Portal Login"}
               </h2>
               <p className="text-sm text-on-surface-variant">
-                Please authenticate using your institutional credentials to
-                access welfare services.
+                {mode === "signup"
+                  ? "Register a family account. Officer/admin access is granted by your welfare directorate."
+                  : "Please authenticate using your institutional credentials to access welfare services."}
               </p>
             </div>
 
@@ -101,22 +138,50 @@ function LoginPage() {
                   htmlFor="service-number"
                   className="block text-sm font-medium text-on-surface mb-1.5"
                 >
-                  Service Number / National ID
+                  Email Address
                 </label>
                 <div className="relative">
                   <Icon
-                    name="badge"
+                    name="mail"
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]"
                   />
                   <input
                     id="service-number"
-                    type="text"
-                    placeholder="Enter ID Number"
-                    defaultValue="UPDF-W-8842"
+                    type="email"
+                    required
+                    placeholder="name@updf.go.ug"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary text-sm"
                   />
                 </div>
               </div>
+
+              {mode === "signup" && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-on-surface mb-1.5">Full Name</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Sarah Nakato"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-on-surface mb-1.5">Service Number / National ID</label>
+                    <input
+                      type="text"
+                      placeholder="UPDF-W-8842"
+                      value={serviceNumber}
+                      onChange={(e) => setServiceNumber(e.target.value)}
+                      className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary text-sm"
+                    />
+                  </div>
+                </>
+              )}
 
               <div>
                 <div className="flex justify-between items-center mb-1.5">
@@ -139,6 +204,8 @@ function LoginPage() {
                     id="password"
                     type={showPass ? "text" : "password"}
                     placeholder="••••••••"
+                    required
+                    minLength={6}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full pl-10 pr-12 py-3 bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary text-sm"
@@ -157,12 +224,29 @@ function LoginPage() {
                 <PasswordMeter strength={strength} />
               </div>
 
+              {error && (
+                <div className="text-sm text-error bg-error-container/40 border border-error/30 rounded-md px-3 py-2">
+                  {error}
+                </div>
+              )}
+
               <button
                 type="submit"
+                disabled={loading}
                 className="w-full py-3.5 bg-primary text-on-primary rounded-md font-semibold flex items-center justify-center gap-2 hover:bg-primary-container transition-colors active:scale-[0.99]"
               >
                 <Icon name="verified_user" fill className="text-[20px]" />
-                Secure Login
+                {loading ? "Please wait…" : mode === "signup" ? "Create Account" : "Secure Login"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setError(null); setMode(mode === "signin" ? "signup" : "signin"); }}
+                className="block w-full text-center text-xs text-secondary hover:underline"
+              >
+                {mode === "signin"
+                  ? "New family? Create an account"
+                  : "Already have an account? Sign in"}
               </button>
 
               <Link
