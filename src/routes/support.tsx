@@ -2,6 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/support")({
   head: () => ({
@@ -26,14 +28,39 @@ const STEPS = [
 
 function SupportPage() {
   const navigate = useNavigate();
+  const { user, profile } = useAuth();
   const [step, setStep] = useState(0);
   const [requestType, setRequestType] = useState("Medical Aid");
   const [urgency, setUrgency] = useState<"Routine" | "Urgent" | "Emergency">("Routine");
   const [notify, setNotify] = useState({ sms: true, email: true, app: true });
+  const [title, setTitle] = useState("");
+  const [details, setDetails] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    if (!user) return;
+    setSubmitting(true);
+    setError(null);
+    const { error } = await supabase.from("support_requests").insert({
+      user_id: user.id,
+      request_type: requestType,
+      urgency: urgency.toLowerCase(),
+      title: title.trim() || `${requestType} request`,
+      details: details.trim() || null,
+      status: "pending",
+    });
+    setSubmitting(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    navigate({ to: "/dashboard" });
+  }
 
   function next() {
     if (step < STEPS.length - 1) setStep(step + 1);
-    else navigate({ to: "/dashboard" });
+    else void submit();
   }
 
   return (
@@ -160,19 +187,30 @@ function SupportPage() {
                 Confirm your household information.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Field label="Service Member Name" value="Sgt. John Nakato" />
-                <Field label="Service Number" value="UPDF-W-8842" />
-                <Field label="Family Head" value="Sarah Nakato" />
-                <Field label="Dependents" value="4" />
-                <Field label="District" value="Wakiso" />
-                <Field label="Mobile" value="+256 772 000 000" />
+                <ReadOnly label="Family Head" value={profile?.full_name || "—"} />
+                <ReadOnly label="Service Number" value={profile?.service_number || "—"} />
+                <ReadOnly label="Account Email" value={user?.email || "—"} />
+                <ReadOnly label="Account ID" value={(user?.id || "").slice(0, 8).toUpperCase()} />
               </div>
               <div className="mt-6">
+                <label className="block text-sm font-medium text-on-surface mb-1.5">
+                  Request Title
+                </label>
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder={`${requestType} — short summary`}
+                  className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant rounded-md text-sm focus:outline-none focus:border-primary"
+                />
+              </div>
+              <div className="mt-4">
                 <label className="block text-sm font-medium text-on-surface mb-1.5">
                   Additional Context
                 </label>
                 <textarea
-                  rows={4}
+                  rows={5}
+                  value={details}
+                  onChange={(e) => setDetails(e.target.value)}
                   placeholder="Briefly describe the situation and why support is needed…"
                   className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant rounded-md text-sm focus:outline-none focus:border-primary"
                 />
@@ -228,8 +266,8 @@ function SupportPage() {
               <div className="grid grid-cols-2 gap-3 mb-6">
                 <Summary label="Type" value={requestType} />
                 <Summary label="Urgency" value={urgency} />
-                <Summary label="Family Head" value="Sarah Nakato" />
-                <Summary label="Documents" value="2 files" />
+                <Summary label="Family Head" value={profile?.full_name || "—"} />
+                <Summary label="Title" value={title || `${requestType} request`} />
               </div>
               <h3 className="text-sm font-medium mb-3">Notification Preferences</h3>
               <div className="space-y-2 mb-4">
@@ -257,6 +295,11 @@ function SupportPage() {
                   </label>
                 ))}
               </div>
+              {error && (
+                <div className="mb-4 text-sm text-error bg-error-container/40 border border-error/30 rounded-md px-3 py-2">
+                  {error}
+                </div>
+              )}
             </>
           )}
 
@@ -270,9 +313,10 @@ function SupportPage() {
             </button>
             <button
               onClick={next}
+              disabled={submitting}
               className="px-5 py-2.5 text-sm font-semibold bg-primary text-on-primary rounded-md hover:bg-primary-container flex items-center gap-2"
             >
-              {step === STEPS.length - 1 ? "Submit Request" : "Continue"}
+              {submitting ? "Submitting…" : step === STEPS.length - 1 ? "Submit Request" : "Continue"}
               <Icon name="arrow_forward" className="text-[18px]" />
             </button>
           </div>
@@ -282,16 +326,15 @@ function SupportPage() {
   );
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function ReadOnly({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <label className="block text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wider">
         {label}
       </label>
-      <input
-        defaultValue={value}
-        className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm focus:outline-none focus:border-primary"
-      />
+      <div className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm text-on-surface">
+        {value}
+      </div>
     </div>
   );
 }

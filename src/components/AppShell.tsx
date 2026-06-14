@@ -1,6 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { Icon } from "./Icon";
+import { useAuth } from "@/hooks/use-auth";
 
 interface NavItem {
   to: string;
@@ -26,16 +27,33 @@ interface AppShellProps {
 
 export function AppShell({ title, subtitle, actions, children }: AppShellProps) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const auth = useAuth();
+
+  if (auth.loading || !auth.session) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-on-surface-variant text-sm">
+        Loading secure portal…
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-on-surface">
-      <TopBar />
+      <TopBar
+        name={auth.profile?.full_name || auth.user?.email || "User"}
+        serviceNumber={auth.profile?.service_number || ""}
+        roleLabel={auth.isAdmin ? "Admin" : auth.isOfficer ? "Officer" : "Family"}
+        onSignOut={auth.signOut}
+      />
       <div className="flex-1 flex w-full">
         <aside className="hidden md:flex md:flex-col w-64 border-r border-outline-variant bg-surface-container-lowest fixed top-16 bottom-0 left-0 z-30 px-4 py-6 gap-1 overflow-y-auto">
           <p className="font-medium text-xs uppercase tracking-widest text-outline px-3 mb-2">
             Navigation
           </p>
-          {NAV.map((n) => {
+          {NAV.filter((n) => {
+            if (n.to === "/admin") return auth.isOfficer || auth.isAdmin;
+            return true;
+          }).map((n) => {
             const active = pathname === n.to || pathname.startsWith(n.to + "/");
             return (
               <Link
@@ -61,13 +79,13 @@ export function AppShell({ title, subtitle, actions, children }: AppShellProps) 
               <Icon name="add" className="text-[20px]" />
               New Support Request
             </Link>
-            <Link
-              to="/login"
+            <button
+              onClick={auth.signOut}
               className="mt-2 flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-on-surface-variant hover:bg-surface-container"
             >
               <Icon name="logout" className="text-[20px]" />
               Sign Out
-            </Link>
+            </button>
           </div>
         </aside>
 
@@ -93,7 +111,24 @@ export function AppShell({ title, subtitle, actions, children }: AppShellProps) 
   );
 }
 
-function TopBar() {
+function TopBar({
+  name,
+  serviceNumber,
+  roleLabel,
+  onSignOut,
+}: {
+  name: string;
+  serviceNumber: string;
+  roleLabel: string;
+  onSignOut: () => void;
+}) {
+  const initials = name
+    .split(" ")
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
   return (
     <header className="bg-primary fixed top-0 inset-x-0 z-40 h-16 flex items-center justify-between px-4 md:px-8 border-b border-primary-container">
       <Link to="/dashboard" className="flex items-center gap-3">
@@ -110,16 +145,23 @@ function TopBar() {
         </div>
       </Link>
       <div className="flex items-center gap-2">
-        <button className="p-2 rounded-md text-on-primary/80 hover:bg-primary-container">
-          <Icon name="notifications" className="text-[22px]" />
+        <button
+          onClick={onSignOut}
+          title="Sign out"
+          className="p-2 rounded-md text-on-primary/80 hover:bg-primary-container"
+        >
+          <Icon name="logout" className="text-[22px]" />
         </button>
         <div className="hidden sm:flex items-center gap-3 pl-3 border-l border-on-primary/20 ml-1">
           <div className="w-9 h-9 rounded-full bg-secondary text-on-secondary flex items-center justify-center font-semibold text-sm">
-            SN
+            {initials || "U"}
           </div>
           <div className="leading-tight">
-            <p className="text-on-primary text-sm font-semibold">Sarah Nakato</p>
-            <p className="text-on-primary/60 text-[11px]">Family · #UPDF-W-8842</p>
+            <p className="text-on-primary text-sm font-semibold">{name}</p>
+            <p className="text-on-primary/60 text-[11px]">
+              {roleLabel}
+              {serviceNumber ? ` · #${serviceNumber}` : ""}
+            </p>
           </div>
         </div>
       </div>

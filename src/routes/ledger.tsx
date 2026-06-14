@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/ledger")({
   head: () => ({
@@ -21,23 +24,55 @@ const REGIONS = ["All Regions", "Central", "Western", "Northern", "Eastern", "We
 const TYPES = ["All Types", "Financial", "Food", "Medical", "Education"];
 
 function LedgerPage() {
+  const { user } = useAuth();
   const [region, setRegion] = useState("All Regions");
   const [type, setType] = useState("All Types");
   const [query, setQuery] = useState("");
 
-  const rows = useMemo(
-    () =>
-      LEDGER.filter((r) => {
-        if (region !== "All Regions" && r.region !== region) return false;
-        if (type !== "All Types" && r.type !== type) return false;
-        if (query && !`${r.recipient} ${r.id}`.toLowerCase().includes(query.toLowerCase()))
-          return false;
-        return true;
-      }),
-    [region, type, query]
-  );
+  const ledgerQuery = useQuery({
+    queryKey: ["ledger", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("aid_ledger")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
 
-  const total = rows.reduce((acc, r) => acc + r.amount, 0);
+  const rows = useMemo(() => {
+    return (ledgerQuery.data ?? []).filter((r) => {
+      if (region !== "All Regions" && r.region !== region) return false;
+      if (type !== "All Types" && r.aid_type !== type) return false;
+      if (
+        query &&
+        !`${r.recipient_name} ${r.id}`.toLowerCase().includes(query.toLowerCase())
+      )
+        return false;
+      return true;
+    });
+  }, [ledgerQuery.data, region, type, query]);
+
+  const total = rows.reduce((acc, r) => acc + Number(r.amount || 0), 0);
+
+  function exportCsv() {
+    const header = ["id", "recipient", "type", "region", "date", "amount", "status"];
+    const lines = rows.map((r) =>
+      [r.id, r.recipient_name, r.aid_type, r.region, r.created_at, r.amount, r.status]
+        .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`)
+        .join(","),
+    );
+    const csv = [header.join(","), ...lines].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `aid-ledger-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <AppShell
@@ -45,11 +80,17 @@ function LedgerPage() {
       subtitle="Full disbursement history. Filter, search and export institutional records."
       actions={
         <>
-          <button className="inline-flex items-center gap-2 border border-outline-variant px-4 py-2.5 rounded-md text-sm font-medium hover:bg-surface-container">
+          <button
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-2 border border-outline-variant px-4 py-2.5 rounded-md text-sm font-medium hover:bg-surface-container"
+          >
             <Icon name="picture_as_pdf" className="text-[18px]" />
-            Export PDF
+            Print / PDF
           </button>
-          <button className="inline-flex items-center gap-2 bg-primary text-on-primary px-4 py-2.5 rounded-md text-sm font-semibold hover:bg-primary-container">
+          <button
+            onClick={exportCsv}
+            className="inline-flex items-center gap-2 bg-primary text-on-primary px-4 py-2.5 rounded-md text-sm font-semibold hover:bg-primary-container"
+          >
             <Icon name="table_chart" className="text-[18px]" />
             Export CSV
           </button>
@@ -98,23 +139,32 @@ function LedgerPage() {
             <tbody className="divide-y divide-outline-variant">
               {rows.map((r) => (
                 <tr key={r.id} className="hover:bg-surface-bright">
-                  <td className="px-5 py-3 font-medium text-primary">{r.id}</td>
-                  <td className="px-5 py-3">{r.recipient}</td>
-                  <td className="px-5 py-3">{r.type}</td>
+                  <td className="px-5 py-3 font-medium text-primary">{r.id.slice(0, 8).toUpperCase()}</td>
+                  <td className="px-5 py-3">{r.recipient_name}</td>
+                  <td className="px-5 py-3">{r.aid_type}</td>
                   <td className="px-5 py-3">{r.region}</td>
-                  <td className="px-5 py-3 text-on-surface-variant">{r.date}</td>
-                  <td className="px-5 py-3 text-right font-semibold">{fmtUGX(r.amount)}</td>
+                  <td className="px-5 py-3 text-on-surface-variant">
+                    {new Date(r.disbursed_at || r.created_at).toLocaleDateString()}
+                  </td>
+                  <td className="px-5 py-3 text-right font-semibold">{fmtUGX(Number(r.amount))}</td>
                   <td className="px-5 py-3">
                     <span className="bg-primary-fixed-dim text-primary px-2.5 py-1 rounded-full text-xs font-medium">
-                      Disbursed
+                      {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
                     </span>
                   </td>
                 </tr>
               ))}
-              {rows.length === 0 && (
+              {!ledgerQuery.isLoading && rows.length === 0 && (
                 <tr>
                   <td colSpan={7} className="text-center py-10 text-on-surface-variant text-sm">
-                    No records match the current filters.
+                    No records yet. Disbursals recorded by welfare officers will appear here.
+                  </td>
+                </tr>
+              )}
+              {ledgerQuery.isLoading && (
+                <tr>
+                  <td colSpan={7} className="text-center py-10 text-on-surface-variant text-sm">
+                    Loading…
                   </td>
                 </tr>
               )}
@@ -179,14 +229,3 @@ function Summary({ label, value, icon }: { label: string; value: string; icon: s
 function fmtUGX(n: number) {
   return n.toLocaleString("en-UG") + " UGX";
 }
-
-const LEDGER = [
-  { id: "DSB-26-0042", recipient: "Sarah Nakato", type: "Medical", region: "Central", date: "12 Jun 2026", amount: 850000 },
-  { id: "DSB-26-0041", recipient: "James Okello", type: "Education", region: "Northern", date: "10 Jun 2026", amount: 1200000 },
-  { id: "DSB-26-0040", recipient: "Grace Atim", type: "Food", region: "Eastern", date: "08 Jun 2026", amount: 400000 },
-  { id: "DSB-26-0039", recipient: "Peter Wamala", type: "Financial", region: "Western", date: "05 Jun 2026", amount: 2000000 },
-  { id: "DSB-26-0038", recipient: "Mary Adongo", type: "Medical", region: "Central", date: "03 Jun 2026", amount: 650000 },
-  { id: "DSB-26-0037", recipient: "Daniel Sserwadda", type: "Education", region: "Central", date: "01 Jun 2026", amount: 1500000 },
-  { id: "DSB-26-0036", recipient: "Esther Acen", type: "Food", region: "West Nile", date: "30 May 2026", amount: 350000 },
-  { id: "DSB-26-0035", recipient: "Robert Kato", type: "Financial", region: "Western", date: "28 May 2026", amount: 1800000 },
-];

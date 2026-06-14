@@ -1,6 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -17,9 +20,47 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function FamilyDashboard() {
+  const { user, profile } = useAuth();
+
+  const requestsQuery = useQuery({
+    queryKey: ["my-requests", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("support_requests")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const ledgerQuery = useQuery({
+    queryKey: ["my-ledger", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("aid_ledger")
+        .select("*")
+        .eq("recipient_user_id", user!.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const requests = requestsQuery.data ?? [];
+  const ledger = ledgerQuery.data ?? [];
+  const active = requests.find((r) => r.status === "pending" || r.status === "verifying" || r.status === "approved");
+  const totalDisbursed = ledger
+    .filter((l) => l.status === "disbursed")
+    .reduce((s, l) => s + Number(l.amount || 0), 0);
+  const approvedCount = ledger.filter((l) => l.status === "disbursed").length;
+  const firstName = (profile?.full_name || "").split(" ")[0] || "there";
+
   return (
     <AppShell
-      title="Welcome back, Sarah"
+      title={`Welcome back, ${firstName}`}
       subtitle="Your family welfare status is secure and monitored."
       actions={
         <Link
@@ -40,28 +81,40 @@ function FamilyDashboard() {
                 Active Aid Request
               </h2>
               <p className="text-xs text-outline mt-0.5">
-                Application ID · #UPDF-W-2026-8842
+                {active ? `Application ID · #${active.id.slice(0, 8).toUpperCase()}` : "No active request"}
               </p>
             </div>
             <span className="bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap">
-              Verification Pending
+              {active ? statusLabel(active.status) : "—"}
             </span>
           </div>
-          <div className="flex justify-between text-xs mb-2 text-on-surface-variant">
-            <span>Verification Progress</span>
-            <span>Step 2 of 4</span>
-          </div>
-          <div className="w-full bg-surface-container h-3 rounded-full overflow-hidden flex mb-3">
-            <div className="bg-primary h-full w-1/4 border-r border-card" />
-            <div className="bg-secondary h-full w-1/4 border-r border-card" />
-            <div className="bg-surface-dim h-full w-2/4" />
-          </div>
-          <div className="grid grid-cols-4 text-center text-xs">
-            <span className="text-primary font-semibold">Submitted</span>
-            <span className="text-secondary font-semibold">Verifying</span>
-            <span className="text-outline">Approval</span>
-            <span className="text-outline">Disbursal</span>
-          </div>
+          {active ? (
+            <>
+              <p className="text-sm text-on-surface mb-3">
+                <span className="font-semibold">{active.title}</span> — {active.request_type} ({active.urgency})
+              </p>
+              <div className="flex justify-between text-xs mb-2 text-on-surface-variant">
+                <span>Verification Progress</span>
+                <span>Step {progressStep(active.status)} of 4</span>
+              </div>
+              <div className="w-full bg-surface-container h-3 rounded-full overflow-hidden flex mb-3">
+                <div className={"bg-primary h-full border-r border-card " + widthFor(progressStep(active.status), 1)} />
+                <div className={"bg-secondary h-full border-r border-card " + widthFor(progressStep(active.status), 2)} />
+                <div className={"bg-primary/70 h-full border-r border-card " + widthFor(progressStep(active.status), 3)} />
+                <div className={"bg-primary h-full " + widthFor(progressStep(active.status), 4)} />
+              </div>
+              <div className="grid grid-cols-4 text-center text-xs">
+                <span className="text-primary font-semibold">Submitted</span>
+                <span className={progressStep(active.status) >= 2 ? "text-secondary font-semibold" : "text-outline"}>Verifying</span>
+                <span className={progressStep(active.status) >= 3 ? "text-primary font-semibold" : "text-outline"}>Approval</span>
+                <span className={progressStep(active.status) >= 4 ? "text-primary font-semibold" : "text-outline"}>Disbursal</span>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-on-surface-variant py-6 text-center">
+              You have no active aid requests. <Link to="/support" className="text-primary underline">Submit a new request</Link>.
+            </p>
+          )}
           <div className="mt-6 flex gap-2">
             <Link
               to="/ledger"
@@ -89,30 +142,37 @@ function FamilyDashboard() {
 
         <section className="col-span-12 lg:col-span-6 bg-card rounded-lg border border-outline-variant overflow-hidden">
           <div className="p-5 border-b border-outline-variant flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-primary">Notifications</h2>
+            <h2 className="text-lg font-semibold text-primary">Recent Requests</h2>
             <Icon name="more_vert" className="text-outline" />
           </div>
           <div className="divide-y divide-outline-variant">
-            {NOTIFICATIONS.map((n, i) => (
-              <div key={i} className="p-4 flex gap-3 hover:bg-surface-bright">
-                <Icon
-                  name={n.icon}
-                  fill={n.filled}
-                  className={"text-[22px] " + n.color}
-                />
-                <div>
-                  <p className="text-sm font-semibold text-on-surface">{n.title}</p>
+            {requestsQuery.isLoading && (
+              <p className="p-4 text-sm text-on-surface-variant">Loading…</p>
+            )}
+            {!requestsQuery.isLoading && requests.length === 0 && (
+              <p className="p-4 text-sm text-on-surface-variant">No requests yet.</p>
+            )}
+            {requests.slice(0, 4).map((r) => (
+              <div key={r.id} className="p-4 flex gap-3 hover:bg-surface-bright">
+                <Icon name="assignment" className="text-[22px] text-primary" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-on-surface truncate">{r.title}</p>
                   <p className="text-sm text-on-surface-variant line-clamp-1">
-                    {n.body}
+                    {r.request_type} · {r.urgency}
                   </p>
-                  <p className="text-xs text-outline mt-1">{n.meta}</p>
+                  <p className="text-xs text-outline mt-1">
+                    {statusLabel(r.status)} · {new Date(r.created_at).toLocaleDateString()}
+                  </p>
                 </div>
               </div>
             ))}
           </div>
-          <button className="w-full p-3 text-sm font-medium text-primary hover:bg-surface-container border-t border-outline-variant">
-            View All Messages
-          </button>
+          <Link
+            to="/support"
+            className="block text-center w-full p-3 text-sm font-medium text-primary hover:bg-surface-container border-t border-outline-variant"
+          >
+            Submit New Request
+          </Link>
         </section>
 
         <section className="col-span-12 lg:col-span-6 bg-card rounded-lg border border-outline-variant overflow-hidden">
@@ -122,23 +182,26 @@ function FamilyDashboard() {
           </div>
           <div className="p-6">
             <div className="grid grid-cols-2 gap-3 mb-6">
-              <Stat label="Total Disbursed" value="2,450,000 UGX" />
-              <Stat label="Items Approved" value="03" />
+              <Stat label="Total Disbursed" value={fmtUGX(totalDisbursed)} />
+              <Stat label="Items Approved" value={String(approvedCount).padStart(2, "0")} />
             </div>
             <h3 className="text-xs uppercase tracking-wider text-on-surface-variant mb-3 font-medium">
               Recent History
             </h3>
             <div className="space-y-2">
-              {HISTORY.map((h) => (
+              {ledger.length === 0 && (
+                <p className="text-sm text-on-surface-variant">No disbursals yet.</p>
+              )}
+              {ledger.slice(0, 4).map((h) => (
                 <div
-                  key={h.label}
+                  key={h.id}
                   className="flex justify-between items-center px-3 py-2.5 border border-outline-variant rounded-md hover:bg-surface-bright"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 rounded-full bg-primary" />
-                    <span className="text-sm">{h.label}</span>
+                    <span className="text-sm">{h.aid_type}</span>
                   </div>
-                  <span className="text-sm font-semibold">{h.amount}</span>
+                  <span className="text-sm font-semibold">{fmtUGX(Number(h.amount))}</span>
                 </div>
               ))}
             </div>
@@ -147,6 +210,23 @@ function FamilyDashboard() {
       </div>
     </AppShell>
   );
+}
+
+function fmtUGX(n: number) {
+  return n.toLocaleString("en-UG") + " UGX";
+}
+function statusLabel(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+function progressStep(s: string) {
+  if (s === "pending") return 1;
+  if (s === "verifying") return 2;
+  if (s === "approved") return 3;
+  if (s === "disbursed" || s === "completed") return 4;
+  return 1;
+}
+function widthFor(current: number, slot: number) {
+  return current >= slot ? "w-1/4" : "w-0";
 }
 
 function QuickAction({
@@ -193,36 +273,3 @@ function Stat({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-
-const NOTIFICATIONS = [
-  {
-    icon: "mail",
-    filled: true,
-    color: "text-primary",
-    title: "Document Request: Medical Aid",
-    body: "Please upload the latest medical certificate from the base hospital.",
-    meta: "2 hours ago · Officer J. Okello",
-  },
-  {
-    icon: "info",
-    filled: false,
-    color: "text-secondary",
-    title: "System Update: Portal Maintenance",
-    body: "The portal will be offline for security patching on Sunday at 0200hrs.",
-    meta: "Yesterday",
-  },
-  {
-    icon: "check_circle",
-    filled: true,
-    color: "text-primary",
-    title: "Verification Successful",
-    body: "Step 1 of your Educational Support request has been approved.",
-    meta: "3 days ago",
-  },
-];
-
-const HISTORY = [
-  { label: "Educational Bursary · Term 2", amount: "1,200,000 UGX" },
-  { label: "Medical Reimbursement", amount: "850,000 UGX" },
-  { label: "Emergency Food Pack", amount: "400,000 UGX" },
-];
