@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SupportRouteImport } from './routes/support'
+import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LedgerRouteImport } from './routes/ledger'
 import { Route as DashboardRouteImport } from './routes/dashboard'
@@ -19,6 +20,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const SupportRoute = SupportRouteImport.update({
   id: '/support',
   path: '/support',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsRoute = ReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/ledger': typeof LedgerRoute
   '/login': typeof LoginRoute
+  '/reports': typeof ReportsRoute
   '/support': typeof SupportRoute
 }
 export interface FileRoutesByTo {
@@ -61,6 +68,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/ledger': typeof LedgerRoute
   '/login': typeof LoginRoute
+  '/reports': typeof ReportsRoute
   '/support': typeof SupportRoute
 }
 export interface FileRoutesById {
@@ -70,13 +78,28 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/ledger': typeof LedgerRoute
   '/login': typeof LoginRoute
+  '/reports': typeof ReportsRoute
   '/support': typeof SupportRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/dashboard' | '/ledger' | '/login' | '/support'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/dashboard'
+    | '/ledger'
+    | '/login'
+    | '/reports'
+    | '/support'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/dashboard' | '/ledger' | '/login' | '/support'
+  to:
+    | '/'
+    | '/admin'
+    | '/dashboard'
+    | '/ledger'
+    | '/login'
+    | '/reports'
+    | '/support'
   id:
     | '__root__'
     | '/'
@@ -84,6 +107,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/ledger'
     | '/login'
+    | '/reports'
     | '/support'
   fileRoutesById: FileRoutesById
 }
@@ -93,6 +117,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   LedgerRoute: typeof LedgerRoute
   LoginRoute: typeof LoginRoute
+  ReportsRoute: typeof ReportsRoute
   SupportRoute: typeof SupportRoute
 }
 
@@ -103,6 +128,13 @@ declare module '@tanstack/react-router' {
       path: '/support'
       fullPath: '/support'
       preLoaderRoute: typeof SupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports': {
+      id: '/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof ReportsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -149,6 +181,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   LedgerRoute: LedgerRoute,
   LoginRoute: LoginRoute,
+  ReportsRoute: ReportsRoute,
   SupportRoute: SupportRoute,
 }
 export const routeTree = rootRouteImport
