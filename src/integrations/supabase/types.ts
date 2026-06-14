@@ -14,16 +14,144 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      aid_ledger: {
+        Row: {
+          aid_type: string
+          amount: number
+          created_at: string
+          created_by: string | null
+          disbursed_at: string | null
+          id: string
+          recipient_name: string
+          recipient_user_id: string | null
+          region: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          aid_type: string
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          disbursed_at?: string | null
+          id?: string
+          recipient_name: string
+          recipient_user_id?: string | null
+          region: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          aid_type?: string
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          disbursed_at?: string | null
+          id?: string
+          recipient_name?: string
+          recipient_user_id?: string | null
+          region?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          full_name: string | null
+          id: string
+          service_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          full_name?: string | null
+          id: string
+          service_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          service_number?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      support_requests: {
+        Row: {
+          created_at: string
+          details: string | null
+          id: string
+          request_type: string
+          status: string
+          title: string
+          updated_at: string
+          urgency: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          request_type: string
+          status?: string
+          title: string
+          updated_at?: string
+          urgency?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          request_type?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          urgency?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "family" | "officer" | "admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +278,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["family", "officer", "admin"],
+    },
   },
 } as const
