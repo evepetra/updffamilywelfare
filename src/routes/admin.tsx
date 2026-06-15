@@ -6,6 +6,57 @@ import { Icon } from "@/components/Icon";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 
+function DocsCell({ requestId }: { requestId: string }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["request-docs", requestId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("request_documents")
+        .select("id, file_path, file_name")
+        .eq("request_id", requestId);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const [open, setOpen] = useState(false);
+  if (isLoading) return <span className="text-xs text-on-surface-variant">…</span>;
+  const docs = data ?? [];
+  if (docs.length === 0) {
+    return <span className="text-xs text-on-surface-variant">None</span>;
+  }
+  async function openDoc(path: string) {
+    const { data, error } = await supabase.storage
+      .from("support-documents")
+      .createSignedUrl(path, 60);
+    if (!error && data?.signedUrl) window.open(data.signedUrl, "_blank");
+  }
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+      >
+        <Icon name="description" className="text-[16px]" />
+        {docs.length}
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 w-64 bg-card border border-outline-variant rounded-md shadow-lg p-2">
+          {docs.map((d) => (
+            <button
+              key={d.id}
+              onClick={() => openDoc(d.file_path)}
+              className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-surface-container flex items-center gap-2"
+            >
+              <Icon name="open_in_new" className="text-[14px] text-primary" />
+              <span className="truncate">{d.file_name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
@@ -209,16 +260,17 @@ function AdminDashboard() {
                   <th className="text-left px-5 py-3 font-medium">Type</th>
                   <th className="text-left px-5 py-3 font-medium">Urgency</th>
                   <th className="text-left px-5 py-3 font-medium">Submitted</th>
+                  <th className="text-left px-5 py-3 font-medium">Docs</th>
                   <th className="text-left px-5 py-3 font-medium">Status</th>
                   <th className="text-right px-5 py-3 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant">
                 {requestsQuery.isLoading && (
-                  <tr><td colSpan={6} className="text-center py-10 text-on-surface-variant text-sm">Loading…</td></tr>
+                  <tr><td colSpan={7} className="text-center py-10 text-on-surface-variant text-sm">Loading…</td></tr>
                 )}
                 {!requestsQuery.isLoading && requests.length === 0 && (
-                  <tr><td colSpan={6} className="text-center py-10 text-on-surface-variant text-sm">No requests in queue.</td></tr>
+                  <tr><td colSpan={7} className="text-center py-10 text-on-surface-variant text-sm">No requests in queue.</td></tr>
                 )}
                 {requests.map((r) => (
                   <tr key={r.id} className="hover:bg-surface-bright">
@@ -230,6 +282,9 @@ function AdminDashboard() {
                     <td className="px-5 py-4 capitalize">{r.urgency}</td>
                     <td className="px-5 py-4 text-on-surface-variant">
                       {new Date(r.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-5 py-4">
+                      <DocsCell requestId={r.id} />
                     </td>
                     <td className="px-5 py-4">
                       <StatusPill status={r.status} />
