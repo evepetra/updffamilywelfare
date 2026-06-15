@@ -85,6 +85,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "UPDF Family Welfare Portal" },
+      { name: "twitter:description", content: "Secure institutional portal for UPDF family welfare, aid distribution and support requests." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/644382a5-baec-41a7-8cb6-b472e59595cd/id-preview-32603485--5bba1c5e-6754-440e-8f32-b82e9b8d38e2.lovable.app-1781502254640.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/644382a5-baec-41a7-8cb6-b472e59595cd/id-preview-32603485--5bba1c5e-6754-440e-8f32-b82e9b8d38e2.lovable.app-1781502254640.png" },
     ],
     links: [
       {
