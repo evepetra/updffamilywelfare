@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,24 +37,64 @@ function SupportPage() {
   const [details, setDetails] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function addFiles(list: FileList | null) {
+    if (!list) return;
+    const incoming = Array.from(list).filter((f) => f.size <= 10 * 1024 * 1024);
+    setFiles((prev) => [...prev, ...incoming]);
+  }
 
   async function submit() {
     if (!user) return;
     setSubmitting(true);
     setError(null);
-    const { error } = await supabase.from("support_requests").insert({
+    const { data: inserted, error: insertErr } = await supabase
+      .from("support_requests")
+      .insert({
       user_id: user.id,
       request_type: requestType,
       urgency: urgency.toLowerCase(),
       title: title.trim() || `${requestType} request`,
       details: details.trim() || null,
       status: "pending",
-    });
-    setSubmitting(false);
-    if (error) {
-      setError(error.message);
+      })
+      .select("id")
+      .single();
+    if (insertErr || !inserted) {
+      setSubmitting(false);
+      setError(insertErr?.message ?? "Could not submit request.");
       return;
     }
+
+    for (const file of files) {
+      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `${user.id}/${inserted.id}/${Date.now()}-${safe}`;
+      const { error: upErr } = await supabase.storage
+        .from("support-documents")
+        .upload(path, file, { contentType: file.type, upsert: false });
+      if (upErr) {
+        setSubmitting(false);
+        setError(`Upload failed for ${file.name}: ${upErr.message}`);
+        return;
+      }
+      const { error: docErr } = await supabase.from("request_documents").insert({
+        request_id: inserted.id,
+        user_id: user.id,
+        file_path: path,
+        file_name: file.name,
+        mime_type: file.type || null,
+        size_bytes: file.size,
+      });
+      if (docErr) {
+        setSubmitting(false);
+        setError(`Document record failed: ${docErr.message}`);
+        return;
+      }
+    }
+
+    setSubmitting(false);
     navigate({ to: "/dashboard" });
   }
 
@@ -226,27 +266,57 @@ function SupportPage() {
               <p className="text-sm text-on-surface-variant mb-6">
                 Upload required documentation. PDF, JPG, PNG · max 10MB each.
               </p>
-              <div className="border-2 border-dashed border-outline-variant rounded-lg p-10 text-center bg-surface-container-low">
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".pdf,.jpg,.jpeg,.png"
+                className="hidden"
+                onChange={(e) => {
+                  addFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              <div
+                className="border-2 border-dashed border-outline-variant rounded-lg p-10 text-center bg-surface-container-low cursor-pointer hover:border-primary/40"
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  addFiles(e.dataTransfer.files);
+                }}
+              >
                 <Icon name="cloud_upload" className="text-5xl text-outline" />
                 <p className="text-sm font-medium mt-3">
                   Drag and drop files here, or
-                  <button className="text-primary underline ml-1">browse</button>
+                  <span className="text-primary underline ml-1">browse</span>
                 </p>
                 <p className="text-xs text-on-surface-variant mt-1">
                   e.g. Medical certificate, school invoice, hospital bill.
                 </p>
               </div>
               <div className="mt-5 space-y-2">
-                {["medical-cert-jun26.pdf", "hospital-receipt.jpg"].map((f) => (
+                {files.length === 0 && (
+                  <p className="text-xs text-on-surface-variant text-center py-2">
+                    No files attached yet.
+                  </p>
+                )}
+                {files.map((f, idx) => (
                   <div
-                    key={f}
+                    key={`${f.name}-${idx}`}
                     className="flex items-center justify-between p-3 border border-outline-variant rounded-md text-sm"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       <Icon name="description" className="text-primary text-[20px]" />
-                      <span>{f}</span>
+                      <span className="truncate">{f.name}</span>
+                      <span className="text-xs text-on-surface-variant shrink-0">
+                        {(f.size / 1024).toFixed(0)} KB
+                      </span>
                     </div>
-                    <button className="text-error">
+                    <button
+                      className="text-error"
+                      onClick={() => setFiles((prev) => prev.filter((_, i) => i !== idx))}
+                    >
                       <Icon name="delete" className="text-[18px]" />
                     </button>
                   </div>
