@@ -209,16 +209,17 @@ function AdminDashboard() {
                   <th className="text-left px-5 py-3 font-medium">Type</th>
                   <th className="text-left px-5 py-3 font-medium">Urgency</th>
                   <th className="text-left px-5 py-3 font-medium">Submitted</th>
+                  <th className="text-left px-5 py-3 font-medium">Docs</th>
                   <th className="text-left px-5 py-3 font-medium">Status</th>
                   <th className="text-right px-5 py-3 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant">
                 {requestsQuery.isLoading && (
-                  <tr><td colSpan={6} className="text-center py-10 text-on-surface-variant text-sm">Loading…</td></tr>
+                  <tr><td colSpan={7} className="text-center py-10 text-on-surface-variant text-sm">Loading…</td></tr>
                 )}
                 {!requestsQuery.isLoading && requests.length === 0 && (
-                  <tr><td colSpan={6} className="text-center py-10 text-on-surface-variant text-sm">No requests in queue.</td></tr>
+                  <tr><td colSpan={7} className="text-center py-10 text-on-surface-variant text-sm">No requests in queue.</td></tr>
                 )}
                 {requests.map((r) => (
                   <tr key={r.id} className="hover:bg-surface-bright">
@@ -230,6 +231,9 @@ function AdminDashboard() {
                     <td className="px-5 py-4 capitalize">{r.urgency}</td>
                     <td className="px-5 py-4 text-on-surface-variant">
                       {new Date(r.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-5 py-4">
+                      <DocsCell requestId={r.id} />
                     </td>
                     <td className="px-5 py-4">
                       <StatusPill status={r.status} />
