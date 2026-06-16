@@ -12,6 +12,16 @@ export const Route = createFileRoute("/manual")({
         content:
           "Step-by-step institutional manual covering authentication, request workflow, reporting and security protocols.",
       },
+      { property: "og:title", content: "Institutional User Manual | UPDF Welfare Portal" },
+      {
+        property: "og:description",
+        content:
+          "Step-by-step institutional manual covering authentication, request workflow, reporting and security protocols.",
+      },
+      { property: "og:url", content: "https://updffamilywelfare.lovable.app/manual" },
+    ],
+    links: [
+      { rel: "canonical", href: "https://updffamilywelfare.lovable.app/manual" },
     ],
   }),
   component: ManualPage,
