@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /ledger
+Disallow: /reports
+Disallow: /support
+
+Sitemap: https://updffamilywelfare.lovable.app/sitemap.xml
