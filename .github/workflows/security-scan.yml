@@ -1,0 +1,111 @@
+name: Security Scan
+
+# Blocks PR merges when connector-based security scanners (Wiz, Aikido)
+# report new findings. Configure these as required status checks in
+# Settings -> Branches -> Branch protection rules for `main`.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+  security-events: write
+
+jobs:
+  wiz-scan:
+    name: Wiz IaC & Secrets Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Skip if Wiz credentials missing
+        id: gate
+        run: |
+          if [ -z "${{ secrets.WIZ_CLIENT_ID }}" ] || [ -z "${{ secrets.WIZ_CLIENT_SECRET }}" ]; then
+            echo "Wiz credentials not configured; skipping scan."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download Wiz CLI
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          curl -fsSL -o wizcli \
+            "https://wizcli.app.wiz.io/latest/wizcli-linux-amd64"
+          chmod +x wizcli
+          sudo mv wizcli /usr/local/bin/wizcli
+
+      - name: Authenticate Wiz CLI
+        if: steps.gate.outputs.run == 'true'
+        run: wizcli auth --id "$WIZ_CLIENT_ID" --secret "$WIZ_CLIENT_SECRET"
+        env:
+          WIZ_CLIENT_ID: ${{ secrets.WIZ_CLIENT_ID }}
+          WIZ_CLIENT_SECRET: ${{ secrets.WIZ_CLIENT_SECRET }}
+
+      - name: Scan repository (IaC + secrets) and fail on new findings
+        if: steps.gate.outputs.run == 'true'
+        # --policy-hits-only: exit non-zero only if the configured Wiz policy
+        # is violated. Tune policy names to match your Wiz tenant.
+        run: |
+          wizcli dir scan \
+            --path . \
+            --policy "Default secrets policy" \
+            --policy "Default IaC policy" \
+            --policy-hits-only
+
+  aikido-scan:
+    name: Aikido SAST/Secrets Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Skip if Aikido token missing
+        id: gate
+        run: |
+          if [ -z "${{ secrets.AIKIDO_API_TOKEN }}" ]; then
+            echo "Aikido token not configured; skipping scan."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run Aikido scan (fails on new high/critical findings)
+        if: steps.gate.outputs.run == 'true'
+        uses: AikidoSec/github-actions-workflow@v1
+        with:
+          secret-key: ${{ secrets.AIKIDO_API_TOKEN }}
+          fail-on-dependency-scan: true
+          fail-on-sast-scan: true
+          fail-on-iac-scan: true
+          fail-on-secrets-scan: true
+          minimum-severity: 'HIGH'
+          post-scan-status-comment: 'on'
+          post-sast-review-comments: 'on'
+
+  enforcement-gate:
+    name: Security Gate
+    needs: [wiz-scan, aikido-scan]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Fail if any scanner reported findings
+        run: |
+          wiz="${{ needs.wiz-scan.result }}"
+          aikido="${{ needs.aikido-scan.result }}"
+          echo "wiz=$wiz aikido=$aikido"
+          if [ "$wiz" = "failure" ] || [ "$aikido" = "failure" ]; then
+            echo "::error::Connector security scan reported new findings. Resolve in Wiz/Aikido before merging."
+            exit 1
+          fi
+          echo "All connector security scans passed (or skipped due to missing credentials)."
