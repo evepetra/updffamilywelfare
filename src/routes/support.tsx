@@ -46,6 +46,36 @@ function SupportPage() {
     setFiles((prev) => [...prev, ...incoming]);
   }
 
+  // Whitelist of allowed file types with magic-byte signatures.
+  // We never trust the browser-provided `file.type` — it can be spoofed.
+  const ALLOWED_TYPES: { mime: string; ext: string; check: (b: Uint8Array) => boolean }[] = [
+    {
+      mime: "application/pdf",
+      ext: "pdf",
+      check: (b) => b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46, // %PDF
+    },
+    {
+      mime: "image/jpeg",
+      ext: "jpg",
+      check: (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
+    },
+    {
+      mime: "image/png",
+      ext: "png",
+      check: (b) =>
+        b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 &&
+        b[4] === 0x0d && b[5] === 0x0a && b[6] === 0x1a && b[7] === 0x0a,
+    },
+  ];
+
+  async function detectMime(file: File): Promise<string | null> {
+    const head = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+    for (const t of ALLOWED_TYPES) {
+      if (t.check(head)) return t.mime;
+    }
+    return null;
+  }
+
   async function submit() {
     if (!user) return;
     setSubmitting(true);
@@ -69,11 +99,22 @@ function SupportPage() {
     }
 
     for (const file of files) {
+      // Validate by magic bytes — do not trust browser-reported file.type,
+      // which can be spoofed to image/svg+xml or text/html and execute scripts
+      // when officers open the signed URL.
+      const verifiedMime = await detectMime(file);
+      if (!verifiedMime) {
+        setSubmitting(false);
+        setError(
+          `${file.name} is not a supported file. Only PDF, JPG, or PNG documents are accepted.`,
+        );
+        return;
+      }
       const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
       const path = `${user.id}/${inserted.id}/${Date.now()}-${safe}`;
       const { error: upErr } = await supabase.storage
         .from("support-documents")
-        .upload(path, file, { contentType: file.type, upsert: false });
+        .upload(path, file, { contentType: verifiedMime, upsert: false });
       if (upErr) {
         setSubmitting(false);
         setError(`Upload failed for ${file.name}: ${upErr.message}`);
@@ -84,7 +125,7 @@ function SupportPage() {
         user_id: user.id,
         file_path: path,
         file_name: file.name,
-        mime_type: file.type || null,
+        mime_type: verifiedMime,
         size_bytes: file.size,
       });
       if (docErr) {
