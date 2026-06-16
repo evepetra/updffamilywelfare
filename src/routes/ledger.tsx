@@ -15,6 +15,14 @@ export const Route = createFileRoute("/ledger")({
         content:
           "Detailed ledger of family aid disbursals with regional filtering and export tools.",
       },
+      { property: "og:title", content: "Aid Distribution Ledger | UPDF Welfare Portal" },
+      {
+        property: "og:description",
+        content:
+          "Detailed ledger of family aid disbursals with regional filtering and export tools.",
+      },
+      { property: "og:url", content: "https://updffamilywelfare.lovable.app/ledger" },
+      { name: "robots", content: "noindex" },
     ],
   }),
   component: LedgerPage,

@@ -12,6 +12,14 @@ export const Route = createFileRoute("/reports")({
         content:
           "Generate, schedule and export advanced welfare reports across regions, periods and aid types.",
       },
+      { property: "og:title", content: "Advanced Reporting | UPDF Welfare Portal" },
+      {
+        property: "og:description",
+        content:
+          "Generate, schedule and export advanced welfare reports across regions, periods and aid types.",
+      },
+      { property: "og:url", content: "https://updffamilywelfare.lovable.app/reports" },
+      { name: "robots", content: "noindex" },
     ],
   }),
   component: ReportsPage,

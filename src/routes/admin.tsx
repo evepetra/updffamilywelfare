@@ -66,6 +66,14 @@ export const Route = createFileRoute("/admin")({
         content:
           "Officer and administrator view of welfare requests, regional distribution, and personnel queues.",
       },
+      { property: "og:title", content: "Officer Console | UPDF Welfare Portal" },
+      {
+        property: "og:description",
+        content:
+          "Officer and administrator view of welfare requests, regional distribution, and personnel queues.",
+      },
+      { property: "og:url", content: "https://updffamilywelfare.lovable.app/admin" },
+      { name: "robots", content: "noindex" },
     ],
   }),
   component: AdminDashboard,

@@ -1,0 +1,12 @@
+# UPDF Family Welfare Portal
+
+> Secure institutional portal for Uganda People's Defence Force (UPDF) families
+> to request welfare support, track aid disbursals, and access the user manual.
+> Most surfaces require authentication; only the login page and public manual
+> are reachable without sign-in.
+
+## Pages
+
+- [Login](/login): Institutional sign-in and family account creation.
+- [User Manual](/manual): Step-by-step guide covering authentication, support
+  requests, reporting, and security protocols.

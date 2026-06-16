@@ -14,6 +14,14 @@ export const Route = createFileRoute("/support")({
         content:
           "Submit a new family welfare support request with documents, urgency level, and notification preferences.",
       },
+      { property: "og:title", content: "Submit Support Request | UPDF Welfare Portal" },
+      {
+        property: "og:description",
+        content:
+          "Submit a new family welfare support request with documents, urgency level, and notification preferences.",
+      },
+      { property: "og:url", content: "https://updffamilywelfare.lovable.app/support" },
+      { name: "robots", content: "noindex" },
     ],
   }),
   component: SupportPage,

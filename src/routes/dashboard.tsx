@@ -14,6 +14,14 @@ export const Route = createFileRoute("/dashboard")({
         content:
           "Monitor the status of your family welfare requests, aid disbursals, and institutional notifications.",
       },
+      { property: "og:title", content: "Family Dashboard | UPDF Welfare Portal" },
+      {
+        property: "og:description",
+        content:
+          "Monitor the status of your family welfare requests, aid disbursals, and institutional notifications.",
+      },
+      { property: "og:url", content: "https://updffamilywelfare.lovable.app/dashboard" },
+      { name: "robots", content: "noindex" },
     ],
   }),
   component: FamilyDashboard,
