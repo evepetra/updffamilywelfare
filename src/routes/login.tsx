@@ -12,6 +12,16 @@ export const Route = createFileRoute("/login")({
         content:
           "Authenticate with your institutional credentials to access UPDF family welfare services.",
       },
+      { property: "og:title", content: "Secure Login | UPDF Welfare Portal" },
+      {
+        property: "og:description",
+        content:
+          "Authenticate with your institutional credentials to access UPDF family welfare services.",
+      },
+      { property: "og:url", content: "https://updffamilywelfare.lovable.app/login" },
+    ],
+    links: [
+      { rel: "canonical", href: "https://updffamilywelfare.lovable.app/login" },
     ],
   }),
   component: LoginPage,
@@ -75,7 +85,7 @@ function LoginPage() {
             <Icon name="shield" fill className="text-primary text-[22px]" />
           </div>
           <h1 className="text-on-primary font-bold tracking-tight">
-            UPDF Welfare Portal
+            UPDF Welfare Portal — Secure Institutional Access
           </h1>
         </div>
       </header>
@@ -213,6 +223,8 @@ function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowPass((v) => !v)}
+                    aria-label={showPass ? "Hide password" : "Show password"}
+                    aria-pressed={showPass}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-primary"
                   >
                     <Icon
