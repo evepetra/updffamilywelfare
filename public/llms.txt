@@ -10,3 +10,5 @@
 - [Login](/login): Institutional sign-in and family account creation.
 - [User Manual](/manual): Step-by-step guide covering authentication, support
   requests, reporting, and security protocols.
+- [Military Child Care Assistance](/support/child-care): Eligibility, MCCYN
+  fee-assistance programs, and how to apply for child care support.
