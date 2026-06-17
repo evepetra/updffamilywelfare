@@ -1,5 +1,6 @@
 User-agent: *
 Allow: /
+Allow: /support/child-care
 Disallow: /admin
 Disallow: /dashboard
 Disallow: /ledger
