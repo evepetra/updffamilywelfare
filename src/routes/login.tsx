@@ -203,11 +203,16 @@ function LoginPage() {
                     <label className="block text-sm font-medium text-on-surface mb-1.5">Service Number / National ID</label>
                     <input
                       type="text"
-                      placeholder="UPDF-W-8842"
+                      placeholder="RA/, RO/, RAV/, ROV/ or CIV/…"
+                      pattern="^(?i)(RA|RO|RAV|ROV|CIV)/.+"
+                      title="Must start with RA/, RO/, RAV/, ROV/ or CIV/"
                       value={serviceNumber}
                       onChange={(e) => setServiceNumber(e.target.value)}
                       className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary text-sm"
                     />
+                    <p className="mt-1.5 text-xs text-on-surface-variant">
+                      Accepted prefixes: <span className="font-medium">RA/</span>, <span className="font-medium">RO/</span>, <span className="font-medium">RAV/</span>, <span className="font-medium">ROV/</span> or <span className="font-medium">CIV/</span>
+                    </p>
                   </div>
                 </>
               )}
