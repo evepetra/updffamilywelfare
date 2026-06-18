@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { z } from "zod";
 import { Icon } from "@/components/Icon";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
@@ -29,6 +30,34 @@ export const Route = createFileRoute("/login")({
 });
 
 type Role = "family" | "officer" | "admin";
+
+const SERVICE_NUMBER_REGEX = /^(RA|RO|RAV|ROV|CIV)\/[A-Za-z0-9-]{1,32}$/i;
+
+const signInSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .email({ message: "Enter a valid email address" })
+    .max(255, { message: "Email must be less than 255 characters" }),
+  password: z
+    .string()
+    .min(6, { message: "Password must be at least 6 characters" })
+    .max(128, { message: "Password must be less than 128 characters" }),
+});
+
+const signUpSchema = signInSchema.extend({
+  fullName: z
+    .string()
+    .trim()
+    .nonempty({ message: "Full name is required" })
+    .max(100, { message: "Full name must be less than 100 characters" }),
+  serviceNumber: z
+    .string()
+    .trim()
+    .regex(SERVICE_NUMBER_REGEX, {
+      message: "Service number must start with RA/, RO/, RAV/, ROV/ or CIV/",
+    }),
+});
 
 function LoginPage() {
   const navigate = useNavigate();
@@ -74,18 +103,32 @@ function LoginPage() {
     setLoading(true);
     try {
       if (mode === "signup") {
+        const parsed = signUpSchema.safeParse({ email, password, fullName, serviceNumber });
+        if (!parsed.success) {
+          throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
+        }
         const { error } = await supabase.auth.signUp({
-          email,
-          password,
+          email: parsed.data.email,
+          password: parsed.data.password,
           options: {
             emailRedirectTo: `${window.location.origin}/dashboard`,
-            data: { full_name: fullName, service_number: serviceNumber },
+            data: {
+              full_name: parsed.data.fullName,
+              service_number: parsed.data.serviceNumber.toUpperCase(),
+            },
           },
         });
         if (error) throw error;
         navigate({ to: "/dashboard" });
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const parsed = signInSchema.safeParse({ email, password });
+        if (!parsed.success) {
+          throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
+        }
+        const { error } = await supabase.auth.signInWithPassword({
+          email: parsed.data.email,
+          password: parsed.data.password,
+        });
         if (error) throw error;
         navigate({ to: role === "family" ? "/dashboard" : "/admin" });
       }
@@ -178,6 +221,7 @@ function LoginPage() {
                     id="service-number"
                     type="email"
                     required
+                    maxLength={255}
                     placeholder="name@updf.go.ug"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -193,6 +237,7 @@ function LoginPage() {
                     <input
                       type="text"
                       required
+                      maxLength={100}
                       placeholder="Sarah Nakato"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
@@ -203,8 +248,10 @@ function LoginPage() {
                     <label className="block text-sm font-medium text-on-surface mb-1.5">Service Number / National ID</label>
                     <input
                       type="text"
-                      placeholder="RA/, RO/, RAV/, ROV/ or CIV/…"
-                      pattern="^(?i)(RA|RO|RAV|ROV|CIV)/.+"
+                      required
+                      maxLength={40}
+                      placeholder="RA/12345"
+                      pattern="^(?:RA|RO|RAV|ROV|CIV|ra|ro|rav|rov|civ)/[A-Za-z0-9-]{1,32}$"
                       title="Must start with RA/, RO/, RAV/, ROV/ or CIV/"
                       value={serviceNumber}
                       onChange={(e) => setServiceNumber(e.target.value)}
@@ -240,6 +287,7 @@ function LoginPage() {
                     placeholder="••••••••"
                     required
                     minLength={6}
+                    maxLength={128}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full pl-10 pr-12 py-3 bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary text-sm"
