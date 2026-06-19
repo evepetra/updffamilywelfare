@@ -1,12 +1,28 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { requireStaff } from "@/lib/auth/roles.functions";
 
 export const Route = createFileRoute("/ledger")({
+  ssr: false,
+  beforeLoad: async () => {
+    try {
+      await requireStaff();
+    } catch (err) {
+      const status =
+        err instanceof Response
+          ? err.status
+          : typeof err === "object" && err && "status" in err
+            ? Number((err as { status: unknown }).status)
+            : 0;
+      if (status === 403) throw redirect({ to: "/dashboard" });
+      throw redirect({ to: "/login" });
+    }
+  },
   head: () => ({
     meta: [
       { title: "Aid Distribution Ledger | UPDF Welfare Portal" },

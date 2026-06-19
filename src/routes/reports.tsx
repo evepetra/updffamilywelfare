@@ -1,9 +1,25 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
+import { requireAdmin } from "@/lib/auth/roles.functions";
 
 export const Route = createFileRoute("/reports")({
+  ssr: false,
+  beforeLoad: async () => {
+    try {
+      await requireAdmin();
+    } catch (err) {
+      const status =
+        err instanceof Response
+          ? err.status
+          : typeof err === "object" && err && "status" in err
+            ? Number((err as { status: unknown }).status)
+            : 0;
+      if (status === 403) throw redirect({ to: "/dashboard" });
+      throw redirect({ to: "/login" });
+    }
+  },
   head: () => ({
     meta: [
       { title: "Advanced Reporting | UPDF Welfare Portal" },
