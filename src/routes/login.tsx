@@ -125,11 +125,30 @@ function LoginPage() {
         if (!parsed.success) {
           throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
         }
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data: signInData, error } = await supabase.auth.signInWithPassword({
           email: parsed.data.email,
           password: parsed.data.password,
         });
         if (error) throw error;
+        const uid = signInData.user?.id;
+        let userRoles: Role[] = [];
+        if (uid) {
+          const { data: rs } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", uid);
+          userRoles = ((rs ?? []) as { role: Role }[]).map((r) => r.role);
+        }
+        if (role === "admin" && !userRoles.includes("admin")) {
+          await supabase.auth.signOut();
+          throw new Error(
+            "Admin access is restricted. Family and Militant accounts cannot sign in as Admin.",
+          );
+        }
+        if (role === "officer" && !(userRoles.includes("officer") || userRoles.includes("admin"))) {
+          await supabase.auth.signOut();
+          throw new Error("Your account is not authorised for Militant (Soldier) access.");
+        }
         navigate({ to: role === "family" ? "/dashboard" : "/admin" });
       }
     } catch (err) {
@@ -394,7 +413,7 @@ function LoginPage() {
 
 const ROLES: { value: Role; label: string; icon: string }[] = [
   { value: "family", label: "Family", icon: "family_restroom" },
-  { value: "officer", label: "Officer", icon: "military_tech" },
+  { value: "officer", label: "Militant (Soldier)", icon: "military_tech" },
   { value: "admin", label: "Admin", icon: "admin_panel_settings" },
 ];
 
