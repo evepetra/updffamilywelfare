@@ -210,9 +210,8 @@ function SiteFooter() {
         </p>
       </div>
       <div className="flex gap-5 text-xs text-on-surface-variant">
-        <a className="hover:text-secondary" href="#">Privacy Policy</a>
-        <a className="hover:text-secondary" href="#">Security Protocol</a>
-        <a className="hover:text-secondary" href="#">Contact Admin</a>
+        <Link className="hover:text-secondary" to="/trust">Privacy & Security</Link>
+        <Link className="hover:text-secondary" to="/trust" hash="incident">Contact</Link>
       </div>
     </footer>
   );

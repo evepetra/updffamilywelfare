@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TrustRouteImport } from './routes/trust'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ReportsRouteImport } from './routes/reports'
@@ -20,6 +21,11 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SupportChildCareRouteImport } from './routes/support.child-care'
 
+const TrustRoute = TrustRouteImport.update({
+  id: '/trust',
+  path: '/trust',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SupportRoute = SupportRouteImport.update({
   id: '/support',
   path: '/support',
@@ -81,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/reports': typeof ReportsRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/support': typeof SupportRouteWithChildren
+  '/trust': typeof TrustRoute
   '/support/child-care': typeof SupportChildCareRoute
 }
 export interface FileRoutesByTo {
@@ -93,6 +100,7 @@ export interface FileRoutesByTo {
   '/reports': typeof ReportsRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/support': typeof SupportRouteWithChildren
+  '/trust': typeof TrustRoute
   '/support/child-care': typeof SupportChildCareRoute
 }
 export interface FileRoutesById {
@@ -106,6 +114,7 @@ export interface FileRoutesById {
   '/reports': typeof ReportsRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/support': typeof SupportRouteWithChildren
+  '/trust': typeof TrustRoute
   '/support/child-care': typeof SupportChildCareRoute
 }
 export interface FileRouteTypes {
@@ -120,6 +129,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/sitemap.xml'
     | '/support'
+    | '/trust'
     | '/support/child-care'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -132,6 +142,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/sitemap.xml'
     | '/support'
+    | '/trust'
     | '/support/child-care'
   id:
     | '__root__'
@@ -144,6 +155,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/sitemap.xml'
     | '/support'
+    | '/trust'
     | '/support/child-care'
   fileRoutesById: FileRoutesById
 }
@@ -157,10 +169,18 @@ export interface RootRouteChildren {
   ReportsRoute: typeof ReportsRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SupportRoute: typeof SupportRouteWithChildren
+  TrustRoute: typeof TrustRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/trust': {
+      id: '/trust'
+      path: '/trust'
+      fullPath: '/trust'
+      preLoaderRoute: typeof TrustRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/support': {
       id: '/support'
       path: '/support'
@@ -255,6 +275,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsRoute: ReportsRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SupportRoute: SupportRouteWithChildren,
+  TrustRoute: TrustRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
