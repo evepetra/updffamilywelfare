@@ -17,6 +17,7 @@ import { Route as ManualRouteImport } from './routes/manual'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LedgerRouteImport } from './routes/ledger'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as AdminConsoleRouteImport } from './routes/admin-console'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SupportChildCareRouteImport } from './routes/support.child-care'
@@ -61,6 +62,11 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminConsoleRoute = AdminConsoleRouteImport.update({
+  id: '/admin-console',
+  path: '/admin-console',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -80,6 +86,7 @@ const SupportChildCareRoute = SupportChildCareRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/admin-console': typeof AdminConsoleRoute
   '/dashboard': typeof DashboardRoute
   '/ledger': typeof LedgerRoute
   '/login': typeof LoginRoute
@@ -93,6 +100,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/admin-console': typeof AdminConsoleRoute
   '/dashboard': typeof DashboardRoute
   '/ledger': typeof LedgerRoute
   '/login': typeof LoginRoute
@@ -107,6 +115,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/admin-console': typeof AdminConsoleRoute
   '/dashboard': typeof DashboardRoute
   '/ledger': typeof LedgerRoute
   '/login': typeof LoginRoute
@@ -122,6 +131,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/admin-console'
     | '/dashboard'
     | '/ledger'
     | '/login'
@@ -135,6 +145,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/admin-console'
     | '/dashboard'
     | '/ledger'
     | '/login'
@@ -148,6 +159,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/admin-console'
     | '/dashboard'
     | '/ledger'
     | '/login'
@@ -162,6 +174,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  AdminConsoleRoute: typeof AdminConsoleRoute
   DashboardRoute: typeof DashboardRoute
   LedgerRoute: typeof LedgerRoute
   LoginRoute: typeof LoginRoute
@@ -230,6 +243,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin-console': {
+      id: '/admin-console'
+      path: '/admin-console'
+      fullPath: '/admin-console'
+      preLoaderRoute: typeof AdminConsoleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin': {
       id: '/admin'
       path: '/admin'
@@ -268,6 +288,7 @@ const SupportRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  AdminConsoleRoute: AdminConsoleRoute,
   DashboardRoute: DashboardRoute,
   LedgerRoute: LedgerRoute,
   LoginRoute: LoginRoute,

@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { z } from "zod";
 import { Icon } from "@/components/Icon";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -32,6 +31,9 @@ export const Route = createFileRoute("/login")({
 type Role = "family" | "officer" | "admin";
 
 const SERVICE_NUMBER_REGEX = /^(RA|RO|RAV|ROV|CIV)\/[A-Za-z0-9-]{1,32}$/i;
+const ARMY_NUMBER_REGEX = /^(RA|RO|RAV|ROV)\/[A-Za-z0-9-]{1,32}$/i;
+// Uganda NIN: 14 chars, starts with CM (male) or CF (female), then 12 alphanumerics
+const NIN_REGEX = /^C[MF][A-Z0-9]{12}$/;
 
 const signInSchema = z.object({
   email: z
@@ -45,17 +47,29 @@ const signInSchema = z.object({
     .max(128, { message: "Password must be less than 128 characters" }),
 });
 
-const signUpSchema = signInSchema.extend({
+const baseSignUpSchema = signInSchema.extend({
   fullName: z
     .string()
     .trim()
     .nonempty({ message: "Full name is required" })
     .max(100, { message: "Full name must be less than 100 characters" }),
-  serviceNumber: z
+  nin: z
     .string()
     .trim()
-    .regex(SERVICE_NUMBER_REGEX, {
-      message: "Service number must start with RA/, RO/, RAV/, ROV/ or CIV/",
+    .toUpperCase()
+    .regex(NIN_REGEX, {
+      message: "Enter a valid 14-character National ID (e.g. CM12345678ABCD)",
+    }),
+});
+
+const familySignUpSchema = baseSignUpSchema;
+
+const soldierSignUpSchema = baseSignUpSchema.extend({
+  armyNumber: z
+    .string()
+    .trim()
+    .regex(ARMY_NUMBER_REGEX, {
+      message: "Army Number must start with RA/, RO/, RAV/ or ROV/",
     }),
 });
 
@@ -67,10 +81,10 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
-  const [serviceNumber, setServiceNumber] = useState("");
+  const [nin, setNin] = useState("");
+  const [armyNumber, setArmyNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -80,33 +94,27 @@ function LoginPage() {
 
   const strength = passwordStrength(password);
 
-  async function onGoogle() {
-    setError(null);
-    setGoogleLoading(true);
-    try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: `${window.location.origin}/dashboard`,
-      });
-      if (result.error) throw new Error(result.error.message ?? "Google sign-in failed");
-      if (result.redirected) return;
-      navigate({ to: "/dashboard" });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Google sign-in failed");
-    } finally {
-      setGoogleLoading(false);
-    }
-  }
-
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
       if (mode === "signup") {
-        const parsed = signUpSchema.safeParse({ email, password, fullName, serviceNumber });
+        if (role === "admin") {
+          throw new Error(
+            "Admin accounts cannot self-register. Please contact your welfare directorate.",
+          );
+        }
+        const schema = role === "officer" ? soldierSignUpSchema : familySignUpSchema;
+        const parsed = schema.safeParse(
+          role === "officer"
+            ? { email, password, fullName, nin, armyNumber }
+            : { email, password, fullName, nin },
+        );
         if (!parsed.success) {
           throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
         }
+        const army = role === "officer" ? armyNumber.trim().toUpperCase() : "";
         const { error } = await supabase.auth.signUp({
           email: parsed.data.email,
           password: parsed.data.password,
@@ -114,7 +122,11 @@ function LoginPage() {
             emailRedirectTo: `${window.location.origin}/dashboard`,
             data: {
               full_name: parsed.data.fullName,
-              service_number: parsed.data.serviceNumber.toUpperCase(),
+              nin: parsed.data.nin.toUpperCase(),
+              signup_role: role,
+              ...(role === "officer"
+                ? { army_number: army, service_number: army }
+                : {}),
             },
           },
         });
@@ -149,7 +161,14 @@ function LoginPage() {
           await supabase.auth.signOut();
           throw new Error("Your account is not authorised for Militant (Soldier) access.");
         }
-        navigate({ to: role === "family" ? "/dashboard" : "/admin" });
+        // Different landing pages per role
+        const dest =
+          role === "admin"
+            ? "/admin-console"
+            : role === "officer"
+              ? "/admin"
+              : "/dashboard";
+        navigate({ to: dest });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed");
@@ -264,22 +283,50 @@ function LoginPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-on-surface mb-1.5">Service Number / National ID</label>
+                    <label className="block text-sm font-medium text-on-surface mb-1.5">
+                      National ID Number (NIN)
+                    </label>
                     <input
                       type="text"
                       required
-                      maxLength={40}
-                      placeholder="RA/12345"
-                      pattern="^(?:RA|RO|RAV|ROV|CIV|ra|ro|rav|rov|civ)/[A-Za-z0-9-]{1,32}$"
-                      title="Must start with RA/, RO/, RAV/, ROV/ or CIV/"
-                      value={serviceNumber}
-                      onChange={(e) => setServiceNumber(e.target.value)}
-                      className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary text-sm"
+                      maxLength={14}
+                      placeholder="CM12345678ABCD"
+                      pattern="^[Cc][MmFf][A-Za-z0-9]{12}$"
+                      title="14 characters, starting with CM or CF"
+                      value={nin}
+                      onChange={(e) => setNin(e.target.value.toUpperCase())}
+                      className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary text-sm font-mono uppercase"
                     />
                     <p className="mt-1.5 text-xs text-on-surface-variant">
-                      Accepted prefixes: <span className="font-medium">RA/</span>, <span className="font-medium">RO/</span>, <span className="font-medium">RAV/</span>, <span className="font-medium">ROV/</span> or <span className="font-medium">CIV/</span>
+                      14-character Ugandan NIN starting with <span className="font-medium">CM</span> or <span className="font-medium">CF</span>.
                     </p>
                   </div>
+                  {role === "officer" && (
+                    <div>
+                      <label className="block text-sm font-medium text-on-surface mb-1.5">
+                        Army Number
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        maxLength={40}
+                        placeholder="RA/12345"
+                        pattern="^(?:RA|RO|RAV|ROV|ra|ro|rav|rov)/[A-Za-z0-9-]{1,32}$"
+                        title="Must start with RA/, RO/, RAV/ or ROV/"
+                        value={armyNumber}
+                        onChange={(e) => setArmyNumber(e.target.value)}
+                        className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary text-sm"
+                      />
+                      <p className="mt-1.5 text-xs text-on-surface-variant">
+                        Soldiers must provide both NIN and Army Number. Accepted prefixes: <span className="font-medium">RA/</span>, <span className="font-medium">RO/</span>, <span className="font-medium">RAV/</span>, <span className="font-medium">ROV/</span>.
+                      </p>
+                    </div>
+                  )}
+                  {role === "admin" && (
+                    <div className="text-xs text-on-surface-variant bg-surface-container-low border border-outline-variant rounded-md px-3 py-2.5">
+                      Admin accounts cannot be self-registered. Please contact your welfare directorate.
+                    </div>
+                  )}
                 </>
               )}
 
@@ -340,27 +387,6 @@ function LoginPage() {
               >
                 <Icon name="verified_user" fill className="text-[20px]" />
                 {loading ? "Please wait…" : mode === "signup" ? "Create Account" : "Secure Login"}
-              </button>
-
-              <div className="flex items-center gap-3 text-xs text-on-surface-variant">
-                <div className="flex-1 h-px bg-outline-variant" />
-                <span>or</span>
-                <div className="flex-1 h-px bg-outline-variant" />
-              </div>
-
-              <button
-                type="button"
-                onClick={onGoogle}
-                disabled={googleLoading}
-                className="w-full py-3 bg-surface border-2 border-outline-variant text-on-surface rounded-md font-semibold flex items-center justify-center gap-2.5 hover:border-primary transition-colors active:scale-[0.99]"
-              >
-                <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-                  <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
-                  <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
-                  <path fill="#FBBC05" d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z"/>
-                  <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.167 6.656 3.58 9 3.58z"/>
-                </svg>
-                {googleLoading ? "Redirecting…" : "Continue with Google"}
               </button>
 
               <button
