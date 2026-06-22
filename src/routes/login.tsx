@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { z } from "zod";
 import { Icon } from "@/components/Icon";
 import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { authorizeLogin, recordFailedLogin, validateNin } from "@/lib/auth/login.functions";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -75,6 +77,9 @@ const soldierSignUpSchema = baseSignUpSchema.extend({
 
 function LoginPage() {
   const navigate = useNavigate();
+  const callAuthorize = useServerFn(authorizeLogin);
+  const callRecordFail = useServerFn(recordFailedLogin);
+  const callValidateNin = useServerFn(validateNin);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [role, setRole] = useState<Role>("family");
   const [showPass, setShowPass] = useState(false);
@@ -85,6 +90,13 @@ function LoginPage() {
   const [armyNumber, setArmyNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    email?: string;
+    password?: string;
+    fullName?: string;
+    nin?: string;
+    armyNumber?: string;
+  }>({});
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -97,6 +109,7 @@ function LoginPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setFieldErrors({});
     setLoading(true);
     try {
       if (mode === "signup") {
@@ -112,7 +125,19 @@ function LoginPage() {
             : { email, password, fullName, nin },
         );
         if (!parsed.success) {
-          throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
+          const fe: typeof fieldErrors = {};
+          for (const iss of parsed.error.issues) {
+            const k = iss.path[0] as keyof typeof fieldErrors;
+            if (k && !fe[k]) fe[k] = iss.message;
+          }
+          setFieldErrors(fe);
+          throw new Error("Please correct the highlighted fields.");
+        }
+        // Server-side NIN validation (defense-in-depth; DB also enforces the format)
+        const ninCheck = await callValidateNin({ data: { nin: parsed.data.nin } });
+        if (!ninCheck.valid) {
+          setFieldErrors({ nin: ninCheck.reason ?? "Invalid NIN" });
+          throw new Error(ninCheck.reason ?? "Invalid NIN");
         }
         const army = role === "officer" ? armyNumber.trim().toUpperCase() : "";
         const { error } = await supabase.auth.signUp({
@@ -122,7 +147,7 @@ function LoginPage() {
             emailRedirectTo: `${window.location.origin}/dashboard`,
             data: {
               full_name: parsed.data.fullName,
-              nin: parsed.data.nin.toUpperCase(),
+              nin: ninCheck.nin,
               signup_role: role,
               ...(role === "officer"
                 ? { army_number: army, service_number: army }
@@ -135,31 +160,36 @@ function LoginPage() {
       } else {
         const parsed = signInSchema.safeParse({ email, password });
         if (!parsed.success) {
-          throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
+          const fe: typeof fieldErrors = {};
+          for (const iss of parsed.error.issues) {
+            const k = iss.path[0] as keyof typeof fieldErrors;
+            if (k && !fe[k]) fe[k] = iss.message;
+          }
+          setFieldErrors(fe);
+          throw new Error("Please correct the highlighted fields.");
         }
-        const { data: signInData, error } = await supabase.auth.signInWithPassword({
+        const { error } = await supabase.auth.signInWithPassword({
           email: parsed.data.email,
           password: parsed.data.password,
         });
-        if (error) throw error;
-        const uid = signInData.user?.id;
-        let userRoles: Role[] = [];
-        if (uid) {
-          const { data: rs } = await supabase
-            .from("user_roles")
-            .select("role")
-            .eq("user_id", uid);
-          userRoles = ((rs ?? []) as { role: Role }[]).map((r) => r.role);
+        if (error) {
+          // Record failed attempt in audit log (no session, uses admin client)
+          await callRecordFail({
+            data: {
+              email: parsed.data.email,
+              requestedRole: role,
+              reason: error.message,
+            },
+          }).catch(() => {});
+          throw error;
         }
-        if (role === "admin" && !userRoles.includes("admin")) {
+        // Server-side role authorization + audit (cannot be spoofed)
+        const auth = await callAuthorize({
+          data: { requestedRole: role, email: parsed.data.email },
+        });
+        if (!auth.authorized) {
           await supabase.auth.signOut();
-          throw new Error(
-            "Admin access is restricted. Family and Militant accounts cannot sign in as Admin.",
-          );
-        }
-        if (role === "officer" && !(userRoles.includes("officer") || userRoles.includes("admin"))) {
-          await supabase.auth.signOut();
-          throw new Error("Your account is not authorised for Militant (Soldier) access.");
+          throw new Error(auth.reason ?? "Access denied for the selected role.");
         }
         // Different landing pages per role
         const dest =
@@ -263,9 +293,18 @@ function LoginPage() {
                     placeholder="name@updf.go.ug"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary text-sm"
+                    aria-invalid={!!fieldErrors.email}
+                    className={
+                      "w-full pl-10 pr-4 py-3 bg-surface-container-low border rounded-md focus:outline-none text-sm " +
+                      (fieldErrors.email
+                        ? "border-error focus:border-error"
+                        : "border-outline-variant focus:border-primary")
+                    }
                   />
                 </div>
+                {fieldErrors.email && (
+                  <p className="mt-1.5 text-xs text-error">{fieldErrors.email}</p>
+                )}
               </div>
 
               {mode === "signup" && (
@@ -279,8 +318,17 @@ function LoginPage() {
                       placeholder="Sarah Nakato"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary text-sm"
+                      aria-invalid={!!fieldErrors.fullName}
+                      className={
+                        "w-full px-4 py-3 bg-surface-container-low border rounded-md focus:outline-none text-sm " +
+                        (fieldErrors.fullName
+                          ? "border-error focus:border-error"
+                          : "border-outline-variant focus:border-primary")
+                      }
                     />
+                    {fieldErrors.fullName && (
+                      <p className="mt-1.5 text-xs text-error">{fieldErrors.fullName}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-on-surface mb-1.5">
@@ -295,11 +343,21 @@ function LoginPage() {
                       title="14 characters, starting with CM or CF"
                       value={nin}
                       onChange={(e) => setNin(e.target.value.toUpperCase())}
-                      className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary text-sm font-mono uppercase"
+                      aria-invalid={!!fieldErrors.nin}
+                      className={
+                        "w-full px-4 py-3 bg-surface-container-low border rounded-md focus:outline-none text-sm font-mono uppercase " +
+                        (fieldErrors.nin
+                          ? "border-error focus:border-error"
+                          : "border-outline-variant focus:border-primary")
+                      }
                     />
-                    <p className="mt-1.5 text-xs text-on-surface-variant">
-                      14-character Ugandan NIN starting with <span className="font-medium">CM</span> or <span className="font-medium">CF</span>.
-                    </p>
+                    {fieldErrors.nin ? (
+                      <p className="mt-1.5 text-xs text-error">{fieldErrors.nin}</p>
+                    ) : (
+                      <p className="mt-1.5 text-xs text-on-surface-variant">
+                        14-character Ugandan NIN starting with <span className="font-medium">CM</span> or <span className="font-medium">CF</span>.
+                      </p>
+                    )}
                   </div>
                   {role === "officer" && (
                     <div>
@@ -315,11 +373,21 @@ function LoginPage() {
                         title="Must start with RA/, RO/, RAV/ or ROV/"
                         value={armyNumber}
                         onChange={(e) => setArmyNumber(e.target.value)}
-                        className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary text-sm"
+                        aria-invalid={!!fieldErrors.armyNumber}
+                        className={
+                          "w-full px-4 py-3 bg-surface-container-low border rounded-md focus:outline-none text-sm " +
+                          (fieldErrors.armyNumber
+                            ? "border-error focus:border-error"
+                            : "border-outline-variant focus:border-primary")
+                        }
                       />
-                      <p className="mt-1.5 text-xs text-on-surface-variant">
-                        Soldiers must provide both NIN and Army Number. Accepted prefixes: <span className="font-medium">RA/</span>, <span className="font-medium">RO/</span>, <span className="font-medium">RAV/</span>, <span className="font-medium">ROV/</span>.
-                      </p>
+                      {fieldErrors.armyNumber ? (
+                        <p className="mt-1.5 text-xs text-error">{fieldErrors.armyNumber}</p>
+                      ) : (
+                        <p className="mt-1.5 text-xs text-on-surface-variant">
+                          Soldiers must provide both NIN and Army Number. Accepted prefixes: <span className="font-medium">RA/</span>, <span className="font-medium">RO/</span>, <span className="font-medium">RAV/</span>, <span className="font-medium">ROV/</span>.
+                        </p>
+                      )}
                     </div>
                   )}
                   {role === "admin" && (

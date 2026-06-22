@@ -56,6 +56,42 @@ export type Database = {
         }
         Relationships: []
       }
+      login_audit: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          ip_address: string | null
+          outcome: string
+          reason: string | null
+          requested_role: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          ip_address?: string | null
+          outcome: string
+          reason?: string | null
+          requested_role: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          ip_address?: string | null
+          outcome?: string
+          reason?: string | null
+          requested_role?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           army_number: string | null
@@ -223,6 +259,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_valid_nin: { Args: { _nin: string }; Returns: boolean }
     }
     Enums: {
       app_role: "family" | "officer" | "admin"
