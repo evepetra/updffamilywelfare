@@ -67,7 +67,10 @@ export const authorizeLogin = createServerFn({ method: "POST" })
       reason = "Militant (Soldier) access denied: account lacks officer role.";
     }
 
-    await supabase.from("login_audit").insert({
+    // Audit writes go through the service role only — direct INSERT by
+    // authenticated users is not allowed, so the trail cannot be forged.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("login_audit").insert({
       user_id: userId,
       email,
       requested_role: requested,
