@@ -490,16 +490,6 @@ function LoginPage() {
                 {loading ? "Please wait…" : mode === "signup" ? "Create Account" : "Secure Login"}
               </button>
 
-              <button
-                type="button"
-                onClick={() => { setError(null); setMode(mode === "signin" ? "signup" : "signin"); }}
-                className="block w-full text-center text-xs text-secondary hover:underline"
-              >
-                {mode === "signin"
-                  ? "New family? Create an account"
-                  : "Already have an account? Sign in"}
-              </button>
-
               <Link
                 to="/support"
                 className="block text-center text-xs text-secondary hover:underline"
