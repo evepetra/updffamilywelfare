@@ -79,20 +79,17 @@ async function run() {
 
   // 4. signed-in family cannot delete arbitrary roles
   {
-    const { error } = await a.client
+    // PostgREST: .delete().select() returns the rows actually removed.
+    // RLS hides denied rows, so a non-admin delete must return 0 rows.
+    const { data: deleted, error } = await a.client
       .from("user_roles")
       .delete()
-      .eq("user_id", b.userId);
-    // delete might succeed with 0 rows under RLS without erroring, so verify
-    // that b's family row still exists via a count by user b.
-    const { data: still } = await b.client
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", b.userId);
+      .eq("user_id", b.userId)
+      .select();
     expect(
       "non-admin cannot revoke another user's roles",
-      !!error || (still?.length ?? 0) > 0,
-      error?.message,
+      !!error || (deleted?.length ?? 0) === 0,
+      error?.message ?? `deleted=${deleted?.length ?? 0}`,
     );
   }
 
