@@ -32,10 +32,31 @@ export const Route = createFileRoute("/login")({
 
 type Role = "family" | "officer" | "admin";
 
-const SERVICE_NUMBER_REGEX = /^(RA|RO|RAV|ROV|CIV)\/[A-Za-z0-9-]{1,32}$/i;
-const ARMY_NUMBER_REGEX = /^(RA|RO|RAV|ROV)\/[A-Za-z0-9-]{1,32}$/i;
+// Army Number: RA/ or RAV/ require exactly 6 digits, RO/ or ROV/ require exactly 5 digits.
+const ARMY_NUMBER_REGEX = /^(?:(?:RA|RAV)\/\d{6}|(?:RO|ROV)\/\d{5})$/i;
 // Uganda NIN: 14 chars, starts with CM (male) or CF (female), then 12 alphanumerics
 const NIN_REGEX = /^C[MF][A-Z0-9]{12}$/;
+
+// Ranks from Private to General (UPDF order of precedence)
+const UPDF_RANKS = [
+  "Private",
+  "Lance Corporal",
+  "Corporal",
+  "Sergeant",
+  "Staff Sergeant",
+  "Warrant Officer Class II",
+  "Warrant Officer Class I",
+  "Second Lieutenant",
+  "Lieutenant",
+  "Captain",
+  "Major",
+  "Lieutenant Colonel",
+  "Colonel",
+  "Brigadier",
+  "Major General",
+  "Lieutenant General",
+  "General",
+] as const;
 
 const signInSchema = z.object({
   email: z
@@ -71,7 +92,13 @@ const soldierSignUpSchema = baseSignUpSchema.extend({
     .string()
     .trim()
     .regex(ARMY_NUMBER_REGEX, {
-      message: "Army Number must start with RA/, RO/, RAV/ or ROV/",
+      message: "RA/ or RAV/ must be followed by 6 digits; RO/ or ROV/ by 5 digits",
+    }),
+  rank: z
+    .string()
+    .trim()
+    .refine((v) => (UPDF_RANKS as readonly string[]).includes(v), {
+      message: "Select a valid rank (Private to General)",
     }),
 });
 
@@ -90,6 +117,7 @@ function LoginPage() {
   const [fullName, setFullName] = useState("");
   const [nin, setNin] = useState("");
   const [armyNumber, setArmyNumber] = useState("");
+  const [rank, setRank] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{
@@ -98,6 +126,7 @@ function LoginPage() {
     fullName?: string;
     nin?: string;
     armyNumber?: string;
+    rank?: string;
   }>({});
 
   useEffect(() => {
@@ -119,7 +148,7 @@ function LoginPage() {
         const schema = role === "officer" ? soldierSignUpSchema : familySignUpSchema;
         const parsed = schema.safeParse(
           role === "officer"
-            ? { email, password, fullName, nin, armyNumber }
+            ? { email, password, fullName, nin, armyNumber, rank }
             : { email, password, fullName, nin },
         );
         if (!parsed.success) {
@@ -148,7 +177,7 @@ function LoginPage() {
               nin: ninCheck.nin,
               signup_role: role,
               ...(role === "officer"
-                ? { army_number: army, service_number: army }
+                ? { army_number: army, service_number: army, rank }
                 : {}),
             },
           },
@@ -404,15 +433,42 @@ function LoginPage() {
                   {signupRole === "officer" && (
                     <div>
                       <label className="block text-sm font-medium text-on-surface mb-1.5">
+                        Rank
+                      </label>
+                      <select
+                        required
+                        value={rank}
+                        onChange={(e) => setRank(e.target.value)}
+                        aria-invalid={!!fieldErrors.rank}
+                        className={
+                          "w-full px-4 py-3 bg-surface-container-low border rounded-md focus:outline-none text-sm " +
+                          (fieldErrors.rank
+                            ? "border-error focus:border-error"
+                            : "border-outline-variant focus:border-primary")
+                        }
+                      >
+                        <option value="">Select rank…</option>
+                        {UPDF_RANKS.map((r) => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                      {fieldErrors.rank && (
+                        <p className="mt-1.5 text-xs text-error">{fieldErrors.rank}</p>
+                      )}
+                    </div>
+                  )}
+                  {signupRole === "officer" && (
+                    <div>
+                      <label className="block text-sm font-medium text-on-surface mb-1.5">
                         Army Number
                       </label>
                       <input
                         type="text"
                         required
                         maxLength={40}
-                        placeholder="RA/12345"
-                        pattern="^(?:RA|RO|RAV|ROV|ra|ro|rav|rov)/[A-Za-z0-9-]{1,32}$"
-                        title="Must start with RA/, RO/, RAV/ or ROV/"
+                        placeholder="RA/123456"
+                        pattern="^(?:(?:RA|RAV|ra|rav)/\d{6}|(?:RO|ROV|ro|rov)/\d{5})$"
+                        title="RA/ or RAV/ + 6 digits, or RO/ or ROV/ + 5 digits"
                         value={armyNumber}
                         onChange={(e) => setArmyNumber(e.target.value)}
                         aria-invalid={!!fieldErrors.armyNumber}
@@ -427,7 +483,7 @@ function LoginPage() {
                         <p className="mt-1.5 text-xs text-error">{fieldErrors.armyNumber}</p>
                       ) : (
                         <p className="mt-1.5 text-xs text-on-surface-variant">
-                          Soldiers must provide both NIN and Army Number. Accepted prefixes: <span className="font-medium">RA/</span>, <span className="font-medium">RO/</span>, <span className="font-medium">RAV/</span>, <span className="font-medium">ROV/</span>.
+                          <span className="font-medium">RA/</span> or <span className="font-medium">RAV/</span> followed by 6 digits (e.g. RA/123456), or <span className="font-medium">RO/</span> or <span className="font-medium">ROV/</span> followed by 5 digits (e.g. RO/12345).
                         </p>
                       )}
                     </div>
