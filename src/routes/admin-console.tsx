@@ -1,9 +1,20 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
 import { supabase } from "@/integrations/supabase/client";
 import { requireAdmin } from "@/lib/auth/roles.functions";
+
+type AppRole = "family" | "officer" | "admin";
+type AdminUserRow = {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  service_number: string | null;
+  roles: AppRole[] | null;
+  created_at: string;
+};
 
 export const Route = createFileRoute("/admin-console")({
   ssr: false,
@@ -36,14 +47,20 @@ export const Route = createFileRoute("/admin-console")({
 });
 
 function AdminConsole() {
-  const rolesQuery = useQuery({
-    queryKey: ["admin-user-roles"],
+  const qc = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const usersQuery = useQuery({
+    queryKey: ["admin-users-list"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("user_id, role, created_at")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
+      const { data, error } = await (supabase.rpc as unknown as (
+        fn: string,
+      ) => Promise<{ data: AdminUserRow[] | null; error: { message: string } | null }>)(
+        "admin_list_users",
+      );
+      if (error) throw new Error(error.message);
       return data ?? [];
     },
   });
@@ -61,10 +78,48 @@ function AdminConsole() {
     },
   });
 
-  const roles = rolesQuery.data ?? [];
-  const officers = roles.filter((r) => r.role === "officer").length;
-  const admins = roles.filter((r) => r.role === "admin").length;
-  const families = roles.filter((r) => r.role === "family").length;
+  const users = usersQuery.data ?? [];
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter(
+      (u) =>
+        (u.email ?? "").toLowerCase().includes(q) ||
+        (u.full_name ?? "").toLowerCase().includes(q) ||
+        (u.service_number ?? "").toLowerCase().includes(q),
+    );
+  }, [users, search]);
+
+  const admins = users.filter((u) => u.roles?.includes("admin")).length;
+  const officers = users.filter((u) => u.roles?.includes("officer")).length;
+  const families = users.filter((u) => u.roles?.includes("family")).length;
+
+  async function toggleRole(userId: string, role: AppRole, has: boolean) {
+    const key = `${userId}:${role}`;
+    setBusyKey(key);
+    setActionError(null);
+    try {
+      if (has) {
+        const { error } = await supabase
+          .from("user_roles")
+          .delete()
+          .eq("user_id", userId)
+          .eq("role", role);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("user_roles")
+          .insert({ user_id: userId, role });
+        if (error) throw error;
+      }
+      await qc.invalidateQueries({ queryKey: ["admin-users-list"] });
+      await qc.invalidateQueries({ queryKey: ["admin-role-audit"] });
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Role update failed");
+    } finally {
+      setBusyKey(null);
+    }
+  }
 
   return (
     <AppShell
@@ -87,42 +142,93 @@ function AdminConsole() {
       </div>
 
       <div className="grid grid-cols-12 gap-6">
-        <section className="col-span-12 lg:col-span-7 bg-card border border-outline-variant rounded-lg overflow-hidden">
-          <div className="p-5 border-b border-outline-variant">
-            <h2 className="text-lg font-semibold text-primary">Role Assignments</h2>
-            <p className="text-xs text-on-surface-variant">{roles.length} total entries · most recent first</p>
+        <section className="col-span-12 lg:col-span-8 bg-card border border-outline-variant rounded-lg overflow-hidden">
+          <div className="p-5 border-b border-outline-variant flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-primary">Role Assignment Toolkit</h2>
+              <p className="text-xs text-on-surface-variant">
+                Toggle Admin, Soldier (Officer), or Family on any account. Users can hold multiple roles.
+              </p>
+            </div>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search name, email or service #"
+              className="px-3 py-2 text-sm bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary w-full md:w-64"
+            />
           </div>
+          {actionError && (
+            <div className="px-5 py-2 text-xs text-error bg-error-container/40 border-b border-error/30">
+              {actionError}
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-surface-container-low text-on-surface-variant text-xs uppercase tracking-wider">
                 <tr>
                   <th className="text-left px-5 py-3 font-medium">User</th>
-                  <th className="text-left px-5 py-3 font-medium">Role</th>
-                  <th className="text-left px-5 py-3 font-medium">Granted</th>
+                  <th className="text-left px-5 py-3 font-medium">Email</th>
+                  <th className="text-center px-3 py-3 font-medium">Admin</th>
+                  <th className="text-center px-3 py-3 font-medium">Soldier</th>
+                  <th className="text-center px-3 py-3 font-medium">Family</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant">
-                {rolesQuery.isLoading && (
-                  <tr><td colSpan={3} className="text-center py-8 text-on-surface-variant">Loading…</td></tr>
+                {usersQuery.isLoading && (
+                  <tr><td colSpan={5} className="text-center py-8 text-on-surface-variant">Loading users…</td></tr>
                 )}
-                {!rolesQuery.isLoading && roles.length === 0 && (
-                  <tr><td colSpan={3} className="text-center py-8 text-on-surface-variant">No role assignments yet.</td></tr>
+                {usersQuery.error && !usersQuery.isLoading && (
+                  <tr><td colSpan={5} className="text-center py-8 text-error">
+                    {(usersQuery.error as Error).message}
+                  </td></tr>
                 )}
-                {roles.slice(0, 25).map((r) => (
-                  <tr key={`${r.user_id}-${r.role}`} className="hover:bg-surface-bright">
-                    <td className="px-5 py-3 font-mono text-xs">{r.user_id.slice(0, 8)}…</td>
-                    <td className="px-5 py-3 capitalize">{r.role}</td>
-                    <td className="px-5 py-3 text-on-surface-variant">
-                      {new Date(r.created_at as string).toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
+                {!usersQuery.isLoading && filtered.length === 0 && (
+                  <tr><td colSpan={5} className="text-center py-8 text-on-surface-variant">No users match.</td></tr>
+                )}
+                {filtered.map((u) => {
+                  const userRoles = u.roles ?? [];
+                  return (
+                    <tr key={u.id} className="hover:bg-surface-bright align-middle">
+                      <td className="px-5 py-3">
+                        <p className="font-medium">{u.full_name || "—"}</p>
+                        <p className="text-xs text-outline font-mono">
+                          {u.service_number || u.id.slice(0, 8) + "…"}
+                        </p>
+                      </td>
+                      <td className="px-5 py-3 text-on-surface-variant">{u.email}</td>
+                      {(["admin", "officer", "family"] as AppRole[]).map((role) => {
+                        const has = userRoles.includes(role);
+                        const key = `${u.id}:${role}`;
+                        return (
+                          <td key={role} className="px-3 py-3 text-center">
+                            <button
+                              disabled={busyKey === key}
+                              onClick={() => toggleRole(u.id, role, has)}
+                              className={
+                                "px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors " +
+                                (has
+                                  ? "bg-primary text-on-primary border-primary hover:bg-primary-container"
+                                  : "bg-surface-container-low text-on-surface-variant border-outline-variant hover:border-primary/40")
+                              }
+                              title={has ? `Revoke ${role}` : `Assign ${role}`}
+                            >
+                              {busyKey === key ? "…" : has ? "Granted" : "Assign"}
+                            </button>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
+          <p className="px-5 py-3 text-[11px] text-outline border-t border-outline-variant">
+            Self role-grants are blocked at the database level. Every change is logged in <span className="font-mono">role_change_audit</span>.
+          </p>
         </section>
 
-        <section className="col-span-12 lg:col-span-5 bg-card border border-outline-variant rounded-lg p-6">
+        <section className="col-span-12 lg:col-span-4 bg-card border border-outline-variant rounded-lg p-6">
           <h2 className="text-lg font-semibold text-primary mb-1">Recent Role Audit</h2>
           <p className="text-xs text-on-surface-variant mb-4">Last 15 role changes</p>
           <div className="space-y-3">
