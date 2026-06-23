@@ -99,6 +99,7 @@ export type Database = {
           full_name: string | null
           id: string
           nin: string | null
+          rank: string | null
           service_number: string | null
           updated_at: string
         }
@@ -108,6 +109,7 @@ export type Database = {
           full_name?: string | null
           id: string
           nin?: string | null
+          rank?: string | null
           service_number?: string | null
           updated_at?: string
         }
@@ -117,6 +119,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           nin?: string | null
+          rank?: string | null
           service_number?: string | null
           updated_at?: string
         }
