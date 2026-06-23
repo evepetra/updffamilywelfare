@@ -538,10 +538,9 @@ function LoginPage() {
   );
 }
 
-const ROLES: { value: Role; label: string; icon: string }[] = [
+const SIGNUP_ROLES: { value: Exclude<Role, "admin">; label: string; icon: string }[] = [
   { value: "family", label: "Family", icon: "family_restroom" },
   { value: "officer", label: "Militant (Soldier)", icon: "military_tech" },
-  { value: "admin", label: "Admin", icon: "admin_panel_settings" },
 ];
 
 function passwordStrength(p: string): "weak" | "medium" | "strong" {
