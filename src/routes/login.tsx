@@ -252,32 +252,64 @@ function LoginPage() {
             </div>
 
             <form className="space-y-6" onSubmit={onSubmit}>
-              <div>
-                <label className="block text-sm font-medium text-on-surface mb-2">
-                  Access Role
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {ROLES.map((r) => {
-                    const active = role === r.value;
-                    return (
-                      <button
-                        key={r.value}
-                        type="button"
-                        onClick={() => setRole(r.value)}
-                        className={
-                          "py-3 rounded-md flex flex-col items-center gap-1 text-xs font-medium transition-all border-2 " +
-                          (active
-                            ? "border-primary bg-primary-fixed-dim text-primary"
-                            : "border-outline-variant text-on-surface-variant hover:border-primary/40")
-                        }
-                      >
-                        <Icon name={r.icon} className="text-[20px]" />
-                        <span>{r.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+              {/* Top-level Sign In / Create Account tab switcher (matches the
+                  approved visual). The role selector only appears inside
+                  Create Account because admins cannot self-register and the
+                  signed-in destination is derived from public.user_roles. */}
+              <div role="tablist" aria-label="Authentication mode" className="grid grid-cols-2 gap-2 p-1 bg-surface-container-low border border-outline-variant rounded-md">
+                {(["signin", "signup"] as const).map((m) => {
+                  const active = mode === m;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => { setError(null); setMode(m); }}
+                      className={
+                        "py-2.5 rounded-md text-sm font-semibold transition-colors " +
+                        (active
+                          ? "bg-card text-primary shadow-sm border border-outline-variant"
+                          : "text-on-surface-variant hover:text-primary")
+                      }
+                    >
+                      {m === "signin" ? "Sign In" : "Create Account"}
+                    </button>
+                  );
+                })}
               </div>
+
+              {mode === "signup" && (
+                <div>
+                  <label className="block text-sm font-medium text-on-surface mb-2">
+                    Account Type
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {SIGNUP_ROLES.map((r) => {
+                      const active = signupRole === r.value;
+                      return (
+                        <button
+                          key={r.value}
+                          type="button"
+                          onClick={() => setSignupRole(r.value)}
+                          className={
+                            "py-3 rounded-md flex flex-col items-center gap-1 text-xs font-medium transition-all border-2 " +
+                            (active
+                              ? "border-primary bg-primary-fixed-dim text-primary"
+                              : "border-outline-variant text-on-surface-variant hover:border-primary/40")
+                          }
+                        >
+                          <Icon name={r.icon} className="text-[20px]" />
+                          <span>{r.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-2 text-[11px] text-on-surface-variant">
+                    Admin accounts are provisioned by the welfare directorate and cannot be self-registered.
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label
@@ -365,7 +397,7 @@ function LoginPage() {
                       </p>
                     )}
                   </div>
-                  {role === "officer" && (
+                  {signupRole === "officer" && (
                     <div>
                       <label className="block text-sm font-medium text-on-surface mb-1.5">
                         Army Number
@@ -394,11 +426,6 @@ function LoginPage() {
                           Soldiers must provide both NIN and Army Number. Accepted prefixes: <span className="font-medium">RA/</span>, <span className="font-medium">RO/</span>, <span className="font-medium">RAV/</span>, <span className="font-medium">ROV/</span>.
                         </p>
                       )}
-                    </div>
-                  )}
-                  {role === "admin" && (
-                    <div className="text-xs text-on-surface-variant bg-surface-container-low border border-outline-variant rounded-md px-3 py-2.5">
-                      Admin accounts cannot be self-registered. Please contact your welfare directorate.
                     </div>
                   )}
                 </>
