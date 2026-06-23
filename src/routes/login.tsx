@@ -242,7 +242,11 @@ function LoginPage() {
           <div className="p-8 md:p-10">
             <div className="mb-7">
               <h2 className="text-2xl font-bold text-primary mb-1.5">
-                {mode === "signup" ? "Create Portal Account" : "Secure Portal Login"}
+                {mode === "signup"
+                  ? signupRole === "officer"
+                    ? "New Soldier Create account"
+                    : "Create Portal Account"
+                  : "Secure Portal Login"}
               </h2>
               <p className="text-sm text-on-surface-variant">
                 {mode === "signup"
