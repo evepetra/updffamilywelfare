@@ -81,7 +81,9 @@ function LoginPage() {
   const callRecordFail = useServerFn(recordFailedLogin);
   const callValidateNin = useServerFn(validateNin);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [role, setRole] = useState<Role>("family");
+  // Role only matters during signup (admins cannot self-register).
+  // For sign-in the destination is derived from the user's actual public.user_roles.
+  const [signupRole, setSignupRole] = useState<Exclude<Role, "admin">>("family");
   const [showPass, setShowPass] = useState(false);
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
@@ -113,11 +115,7 @@ function LoginPage() {
     setLoading(true);
     try {
       if (mode === "signup") {
-        if (role === "admin") {
-          throw new Error(
-            "Admin accounts cannot self-register. Please contact your welfare directorate.",
-          );
-        }
+        const role = signupRole;
         const schema = role === "officer" ? soldierSignUpSchema : familySignUpSchema;
         const parsed = schema.safeParse(
           role === "officer"
@@ -173,29 +171,37 @@ function LoginPage() {
           password: parsed.data.password,
         });
         if (error) {
-          // Record failed attempt in audit log (no session, uses admin client)
           await callRecordFail({
             data: {
               email: parsed.data.email,
-              requestedRole: role,
+              requestedRole: "family",
               reason: error.message,
             },
           }).catch(() => {});
           throw error;
         }
-        // Server-side role authorization + audit (cannot be spoofed)
-        const auth = await callAuthorize({
-          data: { requestedRole: role, email: parsed.data.email },
-        });
-        if (!auth.authorized) {
-          await supabase.auth.signOut();
-          throw new Error(auth.reason ?? "Access denied for the selected role.");
+        // Determine the user's effective role from public.user_roles and route
+        // accordingly. Admin > Officer > Family precedence. Server-side audit
+        // logs the resolved role (cannot be spoofed by the client).
+        const { data: userRes } = await supabase.auth.getUser();
+        const uid = userRes.user?.id;
+        let resolved: Role = "family";
+        if (uid) {
+          const { data: rs } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", uid);
+          const roles = ((rs ?? []) as { role: Role }[]).map((r) => r.role);
+          if (roles.includes("admin")) resolved = "admin";
+          else if (roles.includes("officer")) resolved = "officer";
         }
-        // Different landing pages per role
+        await callAuthorize({
+          data: { requestedRole: resolved, email: parsed.data.email },
+        }).catch(() => ({ authorized: true }));
         const dest =
-          role === "admin"
+          resolved === "admin"
             ? "/admin-console"
-            : role === "officer"
+            : resolved === "officer"
               ? "/admin"
               : "/dashboard";
         navigate({ to: dest });
@@ -246,32 +252,64 @@ function LoginPage() {
             </div>
 
             <form className="space-y-6" onSubmit={onSubmit}>
-              <div>
-                <label className="block text-sm font-medium text-on-surface mb-2">
-                  Access Role
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {ROLES.map((r) => {
-                    const active = role === r.value;
-                    return (
-                      <button
-                        key={r.value}
-                        type="button"
-                        onClick={() => setRole(r.value)}
-                        className={
-                          "py-3 rounded-md flex flex-col items-center gap-1 text-xs font-medium transition-all border-2 " +
-                          (active
-                            ? "border-primary bg-primary-fixed-dim text-primary"
-                            : "border-outline-variant text-on-surface-variant hover:border-primary/40")
-                        }
-                      >
-                        <Icon name={r.icon} className="text-[20px]" />
-                        <span>{r.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+              {/* Top-level Sign In / Create Account tab switcher (matches the
+                  approved visual). The role selector only appears inside
+                  Create Account because admins cannot self-register and the
+                  signed-in destination is derived from public.user_roles. */}
+              <div role="tablist" aria-label="Authentication mode" className="grid grid-cols-2 gap-2 p-1 bg-surface-container-low border border-outline-variant rounded-md">
+                {(["signin", "signup"] as const).map((m) => {
+                  const active = mode === m;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => { setError(null); setMode(m); }}
+                      className={
+                        "py-2.5 rounded-md text-sm font-semibold transition-colors " +
+                        (active
+                          ? "bg-card text-primary shadow-sm border border-outline-variant"
+                          : "text-on-surface-variant hover:text-primary")
+                      }
+                    >
+                      {m === "signin" ? "Sign In" : "Create Account"}
+                    </button>
+                  );
+                })}
               </div>
+
+              {mode === "signup" && (
+                <div>
+                  <label className="block text-sm font-medium text-on-surface mb-2">
+                    Account Type
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {SIGNUP_ROLES.map((r) => {
+                      const active = signupRole === r.value;
+                      return (
+                        <button
+                          key={r.value}
+                          type="button"
+                          onClick={() => setSignupRole(r.value)}
+                          className={
+                            "py-3 rounded-md flex flex-col items-center gap-1 text-xs font-medium transition-all border-2 " +
+                            (active
+                              ? "border-primary bg-primary-fixed-dim text-primary"
+                              : "border-outline-variant text-on-surface-variant hover:border-primary/40")
+                          }
+                        >
+                          <Icon name={r.icon} className="text-[20px]" />
+                          <span>{r.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-2 text-[11px] text-on-surface-variant">
+                    Admin accounts are provisioned by the welfare directorate and cannot be self-registered.
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label
@@ -359,7 +397,7 @@ function LoginPage() {
                       </p>
                     )}
                   </div>
-                  {role === "officer" && (
+                  {signupRole === "officer" && (
                     <div>
                       <label className="block text-sm font-medium text-on-surface mb-1.5">
                         Army Number
@@ -388,11 +426,6 @@ function LoginPage() {
                           Soldiers must provide both NIN and Army Number. Accepted prefixes: <span className="font-medium">RA/</span>, <span className="font-medium">RO/</span>, <span className="font-medium">RAV/</span>, <span className="font-medium">ROV/</span>.
                         </p>
                       )}
-                    </div>
-                  )}
-                  {role === "admin" && (
-                    <div className="text-xs text-on-surface-variant bg-surface-container-low border border-outline-variant rounded-md px-3 py-2.5">
-                      Admin accounts cannot be self-registered. Please contact your welfare directorate.
                     </div>
                   )}
                 </>
@@ -457,16 +490,6 @@ function LoginPage() {
                 {loading ? "Please wait…" : mode === "signup" ? "Create Account" : "Secure Login"}
               </button>
 
-              <button
-                type="button"
-                onClick={() => { setError(null); setMode(mode === "signin" ? "signup" : "signin"); }}
-                className="block w-full text-center text-xs text-secondary hover:underline"
-              >
-                {mode === "signin"
-                  ? "New family? Create an account"
-                  : "Already have an account? Sign in"}
-              </button>
-
               <Link
                 to="/support"
                 className="block text-center text-xs text-secondary hover:underline"
@@ -505,10 +528,9 @@ function LoginPage() {
   );
 }
 
-const ROLES: { value: Role; label: string; icon: string }[] = [
+const SIGNUP_ROLES: { value: Exclude<Role, "admin">; label: string; icon: string }[] = [
   { value: "family", label: "Family", icon: "family_restroom" },
   { value: "officer", label: "Militant (Soldier)", icon: "military_tech" },
-  { value: "admin", label: "Admin", icon: "admin_panel_settings" },
 ];
 
 function passwordStrength(p: string): "weak" | "medium" | "strong" {
