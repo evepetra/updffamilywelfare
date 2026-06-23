@@ -64,6 +64,8 @@ function AdminConsole() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [auditUserFilter, setAuditUserFilter] = useState("");
   const [auditRoleFilter, setAuditRoleFilter] = useState<"all" | AppRole>("all");
+  const [auditPage, setAuditPage] = useState(0);
+  const AUDIT_PAGE_SIZE = 50;
 
   const usersQuery = useQuery({
     queryKey: ["admin-users-list"],
@@ -79,15 +81,17 @@ function AdminConsole() {
   });
 
   const auditQuery = useQuery({
-    queryKey: ["admin-role-audit"],
+    queryKey: ["admin-role-audit", auditPage, auditRoleFilter],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("role_change_audit")
-        .select("*")
+        .select("*", { count: "exact" })
         .order("created_at", { ascending: false })
-        .limit(100);
+        .range(auditPage * AUDIT_PAGE_SIZE, auditPage * AUDIT_PAGE_SIZE + AUDIT_PAGE_SIZE - 1);
+      if (auditRoleFilter !== "all") q = q.eq("role", auditRoleFilter);
+      const { data, error, count } = await q;
       if (error) throw error;
-      return (data ?? []) as AuditRow[];
+      return { rows: (data ?? []) as AuditRow[], count: count ?? 0 };
     },
   });
 
@@ -104,7 +108,7 @@ function AdminConsole() {
   }, [users, search]);
 
   const filteredAudit = useMemo(() => {
-    const list = auditQuery.data ?? [];
+    const list = auditQuery.data?.rows ?? [];
     const q = auditUserFilter.trim().toLowerCase();
     return list.filter((a) => {
       if (auditRoleFilter !== "all" && a.role !== auditRoleFilter) return false;
@@ -116,6 +120,35 @@ function AdminConsole() {
       return true;
     });
   }, [auditQuery.data, auditUserFilter, auditRoleFilter, users]);
+
+  const auditTotal = auditQuery.data?.count ?? 0;
+  const auditPageCount = Math.max(1, Math.ceil(auditTotal / AUDIT_PAGE_SIZE));
+
+  function exportAuditCsv() {
+    const rows = filteredAudit;
+    const header = ["created_at", "action", "role", "target_user_id", "target_email", "actor_id"];
+    const esc = (v: unknown) => {
+      const s = v == null ? "" : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = [header.join(",")];
+    for (const a of rows) {
+      const u = users.find((u) => u.id === a.target_user_id);
+      lines.push([
+        a.created_at, a.action, a.role, a.target_user_id, u?.email ?? "", a.actor_id ?? "",
+      ].map(esc).join(","));
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `role-change-audit-${ts}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
 
   const admins = users.filter((u) => u.roles?.includes("admin")).length;
   const officers = users.filter((u) => u.roles?.includes("officer")).length;
@@ -348,7 +381,15 @@ function AdminConsole() {
         </section>
 
         <section className="col-span-12 lg:col-span-4 bg-card border border-outline-variant rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-primary mb-1">Role Change Audit</h2>
+          <div className="flex items-start justify-between mb-1 gap-2">
+            <h2 className="text-lg font-semibold text-primary">Role Change Audit</h2>
+            <button
+              onClick={exportAuditCsv}
+              disabled={filteredAudit.length === 0}
+              className="text-xs px-2.5 py-1 rounded border border-primary text-primary hover:bg-primary hover:text-on-primary disabled:opacity-40"
+              title="Export filtered results to CSV"
+            >Export CSV</button>
+          </div>
           <p className="text-xs text-on-surface-variant mb-3">Filter by user (email / name / id) or role.</p>
           <div className="flex flex-col gap-2 mb-4">
             <input
@@ -359,7 +400,7 @@ function AdminConsole() {
             />
             <select
               value={auditRoleFilter}
-              onChange={(e) => setAuditRoleFilter(e.target.value as "all" | AppRole)}
+              onChange={(e) => { setAuditRoleFilter(e.target.value as "all" | AppRole); setAuditPage(0); }}
               className="px-3 py-2 text-xs bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary"
             >
               <option value="all">All roles</option>
@@ -392,6 +433,23 @@ function AdminConsole() {
                 </div>
               );
             })}
+          </div>
+          <div className="mt-4 flex items-center justify-between text-xs text-on-surface-variant">
+            <span>
+              Page {auditPage + 1} of {auditPageCount} · {auditTotal} total
+            </span>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setAuditPage((p) => Math.max(0, p - 1))}
+                disabled={auditPage === 0}
+                className="px-2 py-1 rounded border border-outline-variant hover:border-primary disabled:opacity-40"
+              >Prev</button>
+              <button
+                onClick={() => setAuditPage((p) => Math.min(auditPageCount - 1, p + 1))}
+                disabled={auditPage >= auditPageCount - 1}
+                className="px-2 py-1 rounded border border-outline-variant hover:border-primary disabled:opacity-40"
+              >Next</button>
+            </div>
           </div>
         </section>
       </div>
