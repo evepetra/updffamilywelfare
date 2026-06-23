@@ -221,7 +221,7 @@ function LoginPage() {
             <Icon name="shield" fill className="text-primary text-[22px]" />
           </div>
           <h1 className="text-on-primary font-bold tracking-tight">
-            UPDF Welfare Portal — Secure Institutional Access
+            UPDF Welfare Portal
           </h1>
         </div>
       </header>
@@ -251,7 +251,7 @@ function LoginPage() {
               <p className="text-sm text-on-surface-variant">
                 {mode === "signup"
                   ? "Register a family account. Officer/admin access is granted by your welfare directorate."
-                  : "Please authenticate using your institutional credentials to access welfare services."}
+                  : "Authenticate with your institutional credentials."}
               </p>
             </div>
 
@@ -441,7 +441,7 @@ function LoginPage() {
                     htmlFor="password"
                     className="block text-sm font-medium text-on-surface"
                   >
-                    Security Password
+                    Password
                   </label>
                   <a className="text-xs text-secondary hover:underline" href="#">
                     Forgot?
