@@ -63,16 +63,10 @@ export const Route = createFileRoute("/admin")({
   ssr: false,
   beforeLoad: async () => {
     try {
-      await requireStaff();
+      const res = await requireStaff();
+      if (!res.authorized) throw redirect({ to: "/dashboard" });
     } catch (err) {
-      // 401 (no/expired session) → /login; 403 (not staff) → /dashboard.
-      const status =
-        err instanceof Response
-          ? err.status
-          : typeof err === "object" && err && "status" in err
-            ? Number((err as { status: unknown }).status)
-            : 0;
-      if (status === 403) throw redirect({ to: "/dashboard" });
+      if (err && typeof err === "object" && "to" in err) throw err;
       throw redirect({ to: "/login" });
     }
   },

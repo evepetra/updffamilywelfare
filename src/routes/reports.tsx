@@ -8,15 +8,10 @@ export const Route = createFileRoute("/reports")({
   ssr: false,
   beforeLoad: async () => {
     try {
-      await requireAdmin();
+      const res = await requireAdmin();
+      if (!res.authorized) throw redirect({ to: "/dashboard" });
     } catch (err) {
-      const status =
-        err instanceof Response
-          ? err.status
-          : typeof err === "object" && err && "status" in err
-            ? Number((err as { status: unknown }).status)
-            : 0;
-      if (status === 403) throw redirect({ to: "/dashboard" });
+      if (err && typeof err === "object" && "to" in err) throw err;
       throw redirect({ to: "/login" });
     }
   },
