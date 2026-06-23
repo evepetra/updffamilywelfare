@@ -433,15 +433,42 @@ function LoginPage() {
                   {signupRole === "officer" && (
                     <div>
                       <label className="block text-sm font-medium text-on-surface mb-1.5">
+                        Rank
+                      </label>
+                      <select
+                        required
+                        value={rank}
+                        onChange={(e) => setRank(e.target.value)}
+                        aria-invalid={!!fieldErrors.rank}
+                        className={
+                          "w-full px-4 py-3 bg-surface-container-low border rounded-md focus:outline-none text-sm " +
+                          (fieldErrors.rank
+                            ? "border-error focus:border-error"
+                            : "border-outline-variant focus:border-primary")
+                        }
+                      >
+                        <option value="">Select rank…</option>
+                        {UPDF_RANKS.map((r) => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                      {fieldErrors.rank && (
+                        <p className="mt-1.5 text-xs text-error">{fieldErrors.rank}</p>
+                      )}
+                    </div>
+                  )}
+                  {signupRole === "officer" && (
+                    <div>
+                      <label className="block text-sm font-medium text-on-surface mb-1.5">
                         Army Number
                       </label>
                       <input
                         type="text"
                         required
                         maxLength={40}
-                        placeholder="RA/12345"
-                        pattern="^(?:RA|RO|RAV|ROV|ra|ro|rav|rov)/[A-Za-z0-9-]{1,32}$"
-                        title="Must start with RA/, RO/, RAV/ or ROV/"
+                        placeholder="RA/123456"
+                        pattern="^(?:(?:RA|RAV|ra|rav)/\d{6}|(?:RO|ROV|ro|rov)/\d{5})$"
+                        title="RA/ or RAV/ + 6 digits, or RO/ or ROV/ + 5 digits"
                         value={armyNumber}
                         onChange={(e) => setArmyNumber(e.target.value)}
                         aria-invalid={!!fieldErrors.armyNumber}
@@ -456,7 +483,7 @@ function LoginPage() {
                         <p className="mt-1.5 text-xs text-error">{fieldErrors.armyNumber}</p>
                       ) : (
                         <p className="mt-1.5 text-xs text-on-surface-variant">
-                          Soldiers must provide both NIN and Army Number. Accepted prefixes: <span className="font-medium">RA/</span>, <span className="font-medium">RO/</span>, <span className="font-medium">RAV/</span>, <span className="font-medium">ROV/</span>.
+                          <span className="font-medium">RA/</span> or <span className="font-medium">RAV/</span> followed by 6 digits (e.g. RA/123456), or <span className="font-medium">RO/</span> or <span className="font-medium">ROV/</span> followed by 5 digits (e.g. RO/12345).
                         </p>
                       )}
                     </div>
