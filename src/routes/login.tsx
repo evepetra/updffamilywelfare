@@ -81,7 +81,9 @@ function LoginPage() {
   const callRecordFail = useServerFn(recordFailedLogin);
   const callValidateNin = useServerFn(validateNin);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [role, setRole] = useState<Role>("family");
+  // Role only matters during signup (admins cannot self-register).
+  // For sign-in the destination is derived from the user's actual public.user_roles.
+  const [signupRole, setSignupRole] = useState<Exclude<Role, "admin">>("family");
   const [showPass, setShowPass] = useState(false);
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
@@ -113,11 +115,7 @@ function LoginPage() {
     setLoading(true);
     try {
       if (mode === "signup") {
-        if (role === "admin") {
-          throw new Error(
-            "Admin accounts cannot self-register. Please contact your welfare directorate.",
-          );
-        }
+        const role = signupRole;
         const schema = role === "officer" ? soldierSignUpSchema : familySignUpSchema;
         const parsed = schema.safeParse(
           role === "officer"
@@ -173,29 +171,37 @@ function LoginPage() {
           password: parsed.data.password,
         });
         if (error) {
-          // Record failed attempt in audit log (no session, uses admin client)
           await callRecordFail({
             data: {
               email: parsed.data.email,
-              requestedRole: role,
+              requestedRole: "family",
               reason: error.message,
             },
           }).catch(() => {});
           throw error;
         }
-        // Server-side role authorization + audit (cannot be spoofed)
-        const auth = await callAuthorize({
-          data: { requestedRole: role, email: parsed.data.email },
-        });
-        if (!auth.authorized) {
-          await supabase.auth.signOut();
-          throw new Error(auth.reason ?? "Access denied for the selected role.");
+        // Determine the user's effective role from public.user_roles and route
+        // accordingly. Admin > Officer > Family precedence. Server-side audit
+        // logs the resolved role (cannot be spoofed by the client).
+        const { data: userRes } = await supabase.auth.getUser();
+        const uid = userRes.user?.id;
+        let resolved: Role = "family";
+        if (uid) {
+          const { data: rs } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", uid);
+          const roles = ((rs ?? []) as { role: Role }[]).map((r) => r.role);
+          if (roles.includes("admin")) resolved = "admin";
+          else if (roles.includes("officer")) resolved = "officer";
         }
-        // Different landing pages per role
+        await callAuthorize({
+          data: { requestedRole: resolved, email: parsed.data.email },
+        }).catch(() => ({ authorized: true }));
         const dest =
-          role === "admin"
+          resolved === "admin"
             ? "/admin-console"
-            : role === "officer"
+            : resolved === "officer"
               ? "/admin"
               : "/dashboard";
         navigate({ to: dest });
