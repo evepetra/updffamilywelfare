@@ -21,6 +21,7 @@ import { Route as AdminConsoleRouteImport } from './routes/admin-console'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SupportChildCareRouteImport } from './routes/support.child-care'
+import { Route as ApiPublicSeedFirstAdminRouteImport } from './routes/api/public/seed-first-admin'
 
 const TrustRoute = TrustRouteImport.update({
   id: '/trust',
@@ -82,6 +83,11 @@ const SupportChildCareRoute = SupportChildCareRouteImport.update({
   path: '/child-care',
   getParentRoute: () => SupportRoute,
 } as any)
+const ApiPublicSeedFirstAdminRoute = ApiPublicSeedFirstAdminRouteImport.update({
+  id: '/api/public/seed-first-admin',
+  path: '/api/public/seed-first-admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -96,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/support': typeof SupportRouteWithChildren
   '/trust': typeof TrustRoute
   '/support/child-care': typeof SupportChildCareRoute
+  '/api/public/seed-first-admin': typeof ApiPublicSeedFirstAdminRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByTo {
   '/support': typeof SupportRouteWithChildren
   '/trust': typeof TrustRoute
   '/support/child-care': typeof SupportChildCareRoute
+  '/api/public/seed-first-admin': typeof ApiPublicSeedFirstAdminRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -125,6 +133,7 @@ export interface FileRoutesById {
   '/support': typeof SupportRouteWithChildren
   '/trust': typeof TrustRoute
   '/support/child-care': typeof SupportChildCareRoute
+  '/api/public/seed-first-admin': typeof ApiPublicSeedFirstAdminRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -141,6 +150,7 @@ export interface FileRouteTypes {
     | '/support'
     | '/trust'
     | '/support/child-care'
+    | '/api/public/seed-first-admin'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -155,6 +165,7 @@ export interface FileRouteTypes {
     | '/support'
     | '/trust'
     | '/support/child-care'
+    | '/api/public/seed-first-admin'
   id:
     | '__root__'
     | '/'
@@ -169,6 +180,7 @@ export interface FileRouteTypes {
     | '/support'
     | '/trust'
     | '/support/child-care'
+    | '/api/public/seed-first-admin'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -183,6 +195,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SupportRoute: typeof SupportRouteWithChildren
   TrustRoute: typeof TrustRoute
+  ApiPublicSeedFirstAdminRoute: typeof ApiPublicSeedFirstAdminRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -271,6 +284,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SupportChildCareRouteImport
       parentRoute: typeof SupportRoute
     }
+    '/api/public/seed-first-admin': {
+      id: '/api/public/seed-first-admin'
+      path: '/api/public/seed-first-admin'
+      fullPath: '/api/public/seed-first-admin'
+      preLoaderRoute: typeof ApiPublicSeedFirstAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -297,6 +317,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SupportRoute: SupportRouteWithChildren,
   TrustRoute: TrustRoute,
+  ApiPublicSeedFirstAdminRoute: ApiPublicSeedFirstAdminRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
