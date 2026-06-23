@@ -32,10 +32,31 @@ export const Route = createFileRoute("/login")({
 
 type Role = "family" | "officer" | "admin";
 
-const SERVICE_NUMBER_REGEX = /^(RA|RO|RAV|ROV|CIV)\/[A-Za-z0-9-]{1,32}$/i;
-const ARMY_NUMBER_REGEX = /^(RA|RO|RAV|ROV)\/[A-Za-z0-9-]{1,32}$/i;
+// Army Number: RA/ or RAV/ require exactly 6 digits, RO/ or ROV/ require exactly 5 digits.
+const ARMY_NUMBER_REGEX = /^(?:(?:RA|RAV)\/\d{6}|(?:RO|ROV)\/\d{5})$/i;
 // Uganda NIN: 14 chars, starts with CM (male) or CF (female), then 12 alphanumerics
 const NIN_REGEX = /^C[MF][A-Z0-9]{12}$/;
+
+// Ranks from Private to General (UPDF order of precedence)
+const UPDF_RANKS = [
+  "Private",
+  "Lance Corporal",
+  "Corporal",
+  "Sergeant",
+  "Staff Sergeant",
+  "Warrant Officer Class II",
+  "Warrant Officer Class I",
+  "Second Lieutenant",
+  "Lieutenant",
+  "Captain",
+  "Major",
+  "Lieutenant Colonel",
+  "Colonel",
+  "Brigadier",
+  "Major General",
+  "Lieutenant General",
+  "General",
+] as const;
 
 const signInSchema = z.object({
   email: z
@@ -71,7 +92,13 @@ const soldierSignUpSchema = baseSignUpSchema.extend({
     .string()
     .trim()
     .regex(ARMY_NUMBER_REGEX, {
-      message: "Army Number must start with RA/, RO/, RAV/ or ROV/",
+      message: "RA/ or RAV/ must be followed by 6 digits; RO/ or ROV/ by 5 digits",
+    }),
+  rank: z
+    .string()
+    .trim()
+    .refine((v) => (UPDF_RANKS as readonly string[]).includes(v), {
+      message: "Select a valid rank (Private to General)",
     }),
 });
 
@@ -90,6 +117,7 @@ function LoginPage() {
   const [fullName, setFullName] = useState("");
   const [nin, setNin] = useState("");
   const [armyNumber, setArmyNumber] = useState("");
+  const [rank, setRank] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{
@@ -98,6 +126,7 @@ function LoginPage() {
     fullName?: string;
     nin?: string;
     armyNumber?: string;
+    rank?: string;
   }>({});
 
   useEffect(() => {
@@ -119,7 +148,7 @@ function LoginPage() {
         const schema = role === "officer" ? soldierSignUpSchema : familySignUpSchema;
         const parsed = schema.safeParse(
           role === "officer"
-            ? { email, password, fullName, nin, armyNumber }
+            ? { email, password, fullName, nin, armyNumber, rank }
             : { email, password, fullName, nin },
         );
         if (!parsed.success) {
@@ -148,7 +177,7 @@ function LoginPage() {
               nin: ninCheck.nin,
               signup_role: role,
               ...(role === "officer"
-                ? { army_number: army, service_number: army }
+                ? { army_number: army, service_number: army, rank }
                 : {}),
             },
           },
