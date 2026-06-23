@@ -92,6 +92,35 @@ export function AppShell({ title, subtitle, actions, children }: AppShellProps) 
         <main className="flex-1 md:ml-64 px-4 md:px-8 py-6 md:py-10 pb-24 md:pb-10 max-w-full">
           <header className="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
             <div>
+            {auth.roles.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {auth.roles.map((r) => (
+                  <span
+                    key={r}
+                    className={
+                      "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wider " +
+                      (r === "admin"
+                        ? "bg-primary text-on-primary"
+                        : r === "officer"
+                          ? "bg-secondary text-on-secondary"
+                          : "bg-tertiary text-on-tertiary")
+                    }
+                  >
+                    <Icon
+                      name={
+                        r === "admin"
+                          ? "admin_panel_settings"
+                          : r === "officer"
+                            ? "military_tech"
+                            : "family_restroom"
+                      }
+                      className="text-[13px]"
+                    />
+                    {r === "officer" ? "Soldier" : r.charAt(0).toUpperCase() + r.slice(1)}
+                  </span>
+                ))}
+              </div>
+            )}
               <h1 className="text-3xl md:text-4xl font-bold text-primary tracking-tight">
                 {title}
               </h1>
