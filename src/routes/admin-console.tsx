@@ -16,6 +16,15 @@ type AdminUserRow = {
   created_at: string;
 };
 
+type AuditRow = {
+  id: string;
+  actor_id: string | null;
+  target_user_id: string;
+  role: AppRole;
+  action: string;
+  created_at: string;
+};
+
 export const Route = createFileRoute("/admin-console")({
   ssr: false,
   beforeLoad: async () => {
@@ -51,6 +60,10 @@ function AdminConsole() {
   const [search, setSearch] = useState("");
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [auditUserFilter, setAuditUserFilter] = useState("");
+  const [auditRoleFilter, setAuditRoleFilter] = useState<"all" | AppRole>("all");
 
   const usersQuery = useQuery({
     queryKey: ["admin-users-list"],
@@ -72,9 +85,9 @@ function AdminConsole() {
         .from("role_change_audit")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(15);
+        .limit(100);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as AuditRow[];
     },
   });
 
@@ -90,12 +103,28 @@ function AdminConsole() {
     );
   }, [users, search]);
 
+  const filteredAudit = useMemo(() => {
+    const list = auditQuery.data ?? [];
+    const q = auditUserFilter.trim().toLowerCase();
+    return list.filter((a) => {
+      if (auditRoleFilter !== "all" && a.role !== auditRoleFilter) return false;
+      if (q) {
+        const u = users.find((u) => u.id === a.target_user_id);
+        const hay = [a.target_user_id, u?.email ?? "", u?.full_name ?? ""].join(" ").toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [auditQuery.data, auditUserFilter, auditRoleFilter, users]);
+
   const admins = users.filter((u) => u.roles?.includes("admin")).length;
   const officers = users.filter((u) => u.roles?.includes("officer")).length;
   const families = users.filter((u) => u.roles?.includes("family")).length;
 
   async function toggleRole(userId: string, role: AppRole, has: boolean) {
     const key = `${userId}:${role}`;
+    const verb = has ? "REVOKE" : "GRANT";
+    if (!window.confirm(`${verb} ${role.toUpperCase()} for this user?\n\nThis change is audited.`)) return;
     setBusyKey(key);
     setActionError(null);
     try {
@@ -118,6 +147,46 @@ function AdminConsole() {
       setActionError(e instanceof Error ? e.message : "Role update failed");
     } finally {
       setBusyKey(null);
+    }
+  }
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function bulkApply(role: AppRole, action: "grant" | "revoke") {
+    if (selected.size === 0) return;
+    const verb = action === "grant" ? "GRANT" : "REVOKE";
+    if (!window.confirm(
+      `${verb} role "${role}" for ${selected.size} selected user(s)?\n\nThis cannot be undone (changes are audited).`,
+    )) return;
+    setBulkBusy(true);
+    setActionError(null);
+    const ids = Array.from(selected);
+    const failures: string[] = [];
+    try {
+      for (const uid of ids) {
+        const u = users.find((x) => x.id === uid);
+        const has = !!u?.roles?.includes(role);
+        if (action === "grant" && !has) {
+          const { error } = await supabase.from("user_roles").insert({ user_id: uid, role });
+          if (error) failures.push(`${u?.email ?? uid}: ${error.message}`);
+        } else if (action === "revoke" && has) {
+          const { error } = await supabase
+            .from("user_roles").delete().eq("user_id", uid).eq("role", role);
+          if (error) failures.push(`${u?.email ?? uid}: ${error.message}`);
+        }
+      }
+      if (failures.length) setActionError(`${failures.length} failure(s): ${failures.slice(0, 3).join("; ")}`);
+      setSelected(new Set());
+      await qc.invalidateQueries({ queryKey: ["admin-users-list"] });
+      await qc.invalidateQueries({ queryKey: ["admin-role-audit"] });
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -157,6 +226,33 @@ function AdminConsole() {
               className="px-3 py-2 text-sm bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary w-full md:w-64"
             />
           </div>
+
+          {selected.size > 0 && (
+            <div className="px-5 py-3 bg-primary-fixed-dim/40 border-b border-outline-variant flex flex-wrap items-center gap-2 text-xs">
+              <span className="font-semibold text-primary mr-2">
+                {selected.size} selected
+              </span>
+              {(["admin", "officer", "family"] as AppRole[]).flatMap((r) => [
+                <button
+                  key={`g-${r}`}
+                  disabled={bulkBusy}
+                  onClick={() => bulkApply(r, "grant")}
+                  className="px-2.5 py-1 rounded border border-primary text-primary hover:bg-primary hover:text-on-primary disabled:opacity-50"
+                >Grant {r}</button>,
+                <button
+                  key={`r-${r}`}
+                  disabled={bulkBusy}
+                  onClick={() => bulkApply(r, "revoke")}
+                  className="px-2.5 py-1 rounded border border-error text-error hover:bg-error hover:text-on-error disabled:opacity-50"
+                >Revoke {r}</button>,
+              ])}
+              <button
+                onClick={() => setSelected(new Set())}
+                className="ml-auto text-on-surface-variant hover:text-primary"
+              >Clear selection</button>
+            </div>
+          )}
+
           {actionError && (
             <div className="px-5 py-2 text-xs text-error bg-error-container/40 border-b border-error/30">
               {actionError}
@@ -166,6 +262,21 @@ function AdminConsole() {
             <table className="w-full text-sm">
               <thead className="bg-surface-container-low text-on-surface-variant text-xs uppercase tracking-wider">
                 <tr>
+                  <th className="px-3 py-3 w-8">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all"
+                      checked={filtered.length > 0 && filtered.every((u) => selected.has(u.id))}
+                      onChange={(e) => {
+                        setSelected((prev) => {
+                          const next = new Set(prev);
+                          if (e.target.checked) filtered.forEach((u) => next.add(u.id));
+                          else filtered.forEach((u) => next.delete(u.id));
+                          return next;
+                        });
+                      }}
+                    />
+                  </th>
                   <th className="text-left px-5 py-3 font-medium">User</th>
                   <th className="text-left px-5 py-3 font-medium">Email</th>
                   <th className="text-center px-3 py-3 font-medium">Admin</th>
@@ -175,20 +286,28 @@ function AdminConsole() {
               </thead>
               <tbody className="divide-y divide-outline-variant">
                 {usersQuery.isLoading && (
-                  <tr><td colSpan={5} className="text-center py-8 text-on-surface-variant">Loading users…</td></tr>
+                  <tr><td colSpan={6} className="text-center py-8 text-on-surface-variant">Loading users…</td></tr>
                 )}
                 {usersQuery.error && !usersQuery.isLoading && (
-                  <tr><td colSpan={5} className="text-center py-8 text-error">
+                  <tr><td colSpan={6} className="text-center py-8 text-error">
                     {(usersQuery.error as Error).message}
                   </td></tr>
                 )}
                 {!usersQuery.isLoading && filtered.length === 0 && (
-                  <tr><td colSpan={5} className="text-center py-8 text-on-surface-variant">No users match.</td></tr>
+                  <tr><td colSpan={6} className="text-center py-8 text-on-surface-variant">No users match.</td></tr>
                 )}
                 {filtered.map((u) => {
                   const userRoles = u.roles ?? [];
                   return (
                     <tr key={u.id} className="hover:bg-surface-bright align-middle">
+                      <td className="px-3 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${u.email ?? u.id}`}
+                          checked={selected.has(u.id)}
+                          onChange={() => toggleSelected(u.id)}
+                        />
+                      </td>
                       <td className="px-5 py-3">
                         <p className="font-medium">{u.full_name || "—"}</p>
                         <p className="text-xs text-outline font-mono">
@@ -229,27 +348,50 @@ function AdminConsole() {
         </section>
 
         <section className="col-span-12 lg:col-span-4 bg-card border border-outline-variant rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-primary mb-1">Recent Role Audit</h2>
-          <p className="text-xs text-on-surface-variant mb-4">Last 15 role changes</p>
-          <div className="space-y-3">
+          <h2 className="text-lg font-semibold text-primary mb-1">Role Change Audit</h2>
+          <p className="text-xs text-on-surface-variant mb-3">Filter by user (email / name / id) or role.</p>
+          <div className="flex flex-col gap-2 mb-4">
+            <input
+              value={auditUserFilter}
+              onChange={(e) => setAuditUserFilter(e.target.value)}
+              placeholder="Filter by user…"
+              className="px-3 py-2 text-xs bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary"
+            />
+            <select
+              value={auditRoleFilter}
+              onChange={(e) => setAuditRoleFilter(e.target.value as "all" | AppRole)}
+              className="px-3 py-2 text-xs bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary"
+            >
+              <option value="all">All roles</option>
+              <option value="admin">Admin</option>
+              <option value="officer">Soldier (officer)</option>
+              <option value="family">Family</option>
+            </select>
+          </div>
+          <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
             {auditQuery.isLoading && (
               <p className="text-sm text-on-surface-variant">Loading…</p>
             )}
-            {!auditQuery.isLoading && (auditQuery.data ?? []).length === 0 && (
-              <p className="text-sm text-on-surface-variant">No role changes recorded.</p>
+            {!auditQuery.isLoading && filteredAudit.length === 0 && (
+              <p className="text-sm text-on-surface-variant">No matching role changes.</p>
             )}
-            {(auditQuery.data ?? []).map((a) => (
-              <div key={a.id} className="flex items-start gap-3 p-3 border border-outline-variant rounded-md">
-                <Icon name="history" className="text-primary text-[18px] mt-0.5" />
-                <div className="text-xs">
-                  <p className="font-medium">
-                    {a.action.toUpperCase()} · <span className="capitalize">{a.role}</span>
-                  </p>
-                  <p className="text-on-surface-variant font-mono">target {String(a.target_user_id).slice(0, 8)}…</p>
-                  <p className="text-outline">{new Date(a.created_at as string).toLocaleString()}</p>
+            {filteredAudit.map((a) => {
+              const target = users.find((u) => u.id === a.target_user_id);
+              return (
+                <div key={a.id} className="flex items-start gap-3 p-3 border border-outline-variant rounded-md">
+                  <Icon name="history" className="text-primary text-[18px] mt-0.5" />
+                  <div className="text-xs flex-1">
+                    <p className="font-medium">
+                      {a.action.toUpperCase()} · <span className="capitalize">{a.role}</span>
+                    </p>
+                    <p className="text-on-surface-variant">
+                      {target?.email ?? <span className="font-mono">{String(a.target_user_id).slice(0, 8)}…</span>}
+                    </p>
+                    <p className="text-outline">{new Date(a.created_at).toLocaleString()}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       </div>
