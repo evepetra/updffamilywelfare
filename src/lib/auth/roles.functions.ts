@@ -36,10 +36,13 @@ export const requireStaff = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     const roles = ((data ?? []) as { role: AppRole }[]).map((r) => r.role);
     const isStaff = roles.includes("admin") || roles.includes("officer");
-    if (!isStaff) {
-      throw new Response("Forbidden: staff access required", { status: 403 });
-    }
-    return { userId: context.userId, roles, isAdmin: roles.includes("admin") };
+    return {
+      userId: context.userId,
+      roles,
+      isAdmin: roles.includes("admin"),
+      isStaff,
+      authorized: isStaff,
+    };
   });
 
 export const requireAdmin = createServerFn({ method: "GET" })
@@ -52,8 +55,5 @@ export const requireAdmin = createServerFn({ method: "GET" })
       .eq("role", "admin")
       .maybeSingle();
     if (error) throw new Error(error.message);
-    if (!data) {
-      throw new Response("Forbidden: admin access required", { status: 403 });
-    }
-    return { userId: context.userId };
+    return { userId: context.userId, authorized: Boolean(data) };
   });
