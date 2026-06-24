@@ -95,6 +95,11 @@ function AdminDashboard() {
   const auth = useAuth();
   const qc = useQueryClient();
   const [recordOpen, setRecordOpen] = useState(false);
+  const [pendingOnly, setPendingOnly] = useState(false);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+  const [auditOpen, setAuditOpen] = useState(false);
   const isStaff = auth.isOfficer || auth.isAdmin;
 
   const requestsQuery = useQuery({
@@ -126,6 +131,40 @@ function AdminDashboard() {
   const requests = requestsQuery.data ?? [];
   const ledger = ledgerQuery.data ?? [];
 
+  const filteredRequests = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return requests.filter((r) => {
+      if (pendingOnly && r.status !== "pending" && r.status !== "verifying") return false;
+      if (!q) return true;
+      return (
+        (r.title ?? "").toLowerCase().includes(q) ||
+        (r.request_type ?? "").toLowerCase().includes(q) ||
+        r.id.toLowerCase().includes(q)
+      );
+    });
+  }, [requests, pendingOnly, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRequests.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedRequests = filteredRequests.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
+
+  const auditQuery = useQuery({
+    queryKey: ["status-audit"],
+    enabled: isStaff && auditOpen,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("request_status_audit")
+        .select("id, request_id, actor_id, old_status, new_status, created_at")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   const kpis = useMemo(() => {
     const total = ledger.reduce((s, l) => s + Number(l.amount || 0), 0);
     const pending = requests.filter((r) => r.status === "pending" || r.status === "verifying").length;
@@ -154,6 +193,7 @@ function AdminDashboard() {
     await supabase.from("support_requests").update({ status }).eq("id", id);
     qc.invalidateQueries({ queryKey: ["admin-requests"] });
     qc.invalidateQueries({ queryKey: ["my-requests"] });
+    qc.invalidateQueries({ queryKey: ["status-audit"] });
   }
 
   if (auth.loading) return null;
@@ -262,14 +302,51 @@ function AdminDashboard() {
 
         {/* Pending requests queue */}
         <section className="col-span-12 bg-card border border-outline-variant rounded-lg overflow-hidden">
-          <div className="p-5 border-b border-outline-variant flex justify-between items-center">
+          <div className="p-5 border-b border-outline-variant flex flex-wrap gap-3 justify-between items-center">
             <div>
-              <h2 className="text-lg font-semibold text-primary">
-                Request Queue
-              </h2>
+              <h2 className="text-lg font-semibold text-primary">Request Queue</h2>
               <p className="text-xs text-on-surface-variant">
-                {requests.length} total
+                {filteredRequests.length} shown · {requests.length} total
               </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Icon
+                  name="search"
+                  className="text-[16px] absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant"
+                />
+                <input
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                  placeholder="Search title, type, ID…"
+                  className="pl-7 pr-3 py-2 text-xs border border-outline-variant rounded-md bg-surface-container-low w-56"
+                />
+              </div>
+              <button
+                onClick={() => {
+                  setPendingOnly((p) => !p);
+                  setPage(1);
+                }}
+                className={
+                  "inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md border " +
+                  (pendingOnly
+                    ? "bg-primary text-on-primary border-primary"
+                    : "border-outline-variant hover:bg-surface-container")
+                }
+              >
+                <Icon name="pending_actions" className="text-[14px]" />
+                Pending only
+              </button>
+              <button
+                onClick={() => setAuditOpen((o) => !o)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md border border-outline-variant hover:bg-surface-container"
+              >
+                <Icon name="history" className="text-[14px]" />
+                {auditOpen ? "Hide audit" : "View audit"}
+              </button>
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -289,10 +366,10 @@ function AdminDashboard() {
                 {requestsQuery.isLoading && (
                   <tr><td colSpan={7} className="text-center py-10 text-on-surface-variant text-sm">Loading…</td></tr>
                 )}
-                {!requestsQuery.isLoading && requests.length === 0 && (
-                  <tr><td colSpan={7} className="text-center py-10 text-on-surface-variant text-sm">No requests in queue.</td></tr>
+                {!requestsQuery.isLoading && filteredRequests.length === 0 && (
+                  <tr><td colSpan={7} className="text-center py-10 text-on-surface-variant text-sm">No requests match the current filter.</td></tr>
                 )}
-                {requests.map((r) => (
+                {pagedRequests.map((r) => (
                   <tr key={r.id} className="hover:bg-surface-bright">
                     <td className="px-5 py-4">
                       <p className="font-medium">{r.title}</p>
@@ -310,24 +387,105 @@ function AdminDashboard() {
                       <StatusPill status={r.status} />
                     </td>
                     <td className="px-5 py-4 text-right">
-                      <select
-                        value={r.status}
-                        onChange={(e) => updateStatus(r.id, e.target.value)}
-                        className="px-2 py-1 text-xs border border-outline-variant rounded bg-surface-container-low"
-                      >
-                        <option value="pending">Pending</option>
-                        <option value="verifying">Verifying</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                        <option value="completed">Completed</option>
-                      </select>
+                      <div className="inline-flex items-center gap-1.5 justify-end">
+                        <button
+                          onClick={() => updateStatus(r.id, "approved")}
+                          disabled={r.status === "approved" || r.status === "completed"}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded bg-primary text-on-primary hover:bg-primary-container disabled:opacity-40"
+                        >
+                          <Icon name="check" className="text-[14px]" />
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => updateStatus(r.id, "rejected")}
+                          disabled={r.status === "rejected"}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded border border-error text-error hover:bg-red-50 disabled:opacity-40"
+                        >
+                          <Icon name="close" className="text-[14px]" />
+                          Reject
+                        </button>
+                        <button
+                          onClick={() => updateStatus(r.id, "completed")}
+                          disabled={r.status === "completed"}
+                          title="Mark complete"
+                          className="inline-flex items-center px-2 py-1 text-xs rounded border border-outline-variant hover:bg-surface-container disabled:opacity-40"
+                        >
+                          <Icon name="task_alt" className="text-[14px]" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          <div className="flex items-center justify-between px-5 py-3 border-t border-outline-variant text-xs text-on-surface-variant">
+            <span>
+              Page {currentPage} of {totalPages}
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+                className="px-3 py-1.5 rounded border border-outline-variant hover:bg-surface-container disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+                className="px-3 py-1.5 rounded border border-outline-variant hover:bg-surface-container disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </section>
+
+        {auditOpen && (
+          <section className="col-span-12 bg-card border border-outline-variant rounded-lg overflow-hidden">
+            <div className="p-5 border-b border-outline-variant">
+              <h2 className="text-lg font-semibold text-primary">Status Change Audit</h2>
+              <p className="text-xs text-on-surface-variant">
+                Most recent 100 approvals, rejections and status updates.
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-surface-container-low text-on-surface-variant text-xs uppercase tracking-wider">
+                  <tr>
+                    <th className="text-left px-5 py-3 font-medium">When</th>
+                    <th className="text-left px-5 py-3 font-medium">Request</th>
+                    <th className="text-left px-5 py-3 font-medium">From</th>
+                    <th className="text-left px-5 py-3 font-medium">To</th>
+                    <th className="text-left px-5 py-3 font-medium">Actor</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant">
+                  {auditQuery.isLoading && (
+                    <tr><td colSpan={5} className="text-center py-8 text-on-surface-variant text-sm">Loading…</td></tr>
+                  )}
+                  {auditQuery.data?.length === 0 && (
+                    <tr><td colSpan={5} className="text-center py-8 text-on-surface-variant text-sm">No audit entries yet.</td></tr>
+                  )}
+                  {(auditQuery.data ?? []).map((a) => (
+                    <tr key={a.id}>
+                      <td className="px-5 py-3 text-on-surface-variant whitespace-nowrap">
+                        {new Date(a.created_at).toLocaleString()}
+                      </td>
+                      <td className="px-5 py-3 font-mono text-xs">#{a.request_id.slice(0, 8).toUpperCase()}</td>
+                      <td className="px-5 py-3 capitalize">{a.old_status ?? "—"}</td>
+                      <td className="px-5 py-3"><StatusPill status={a.new_status} /></td>
+                      <td className="px-5 py-3 font-mono text-xs text-on-surface-variant">
+                        {a.actor_id ? a.actor_id.slice(0, 8) : "system"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
       </div>
 
       {recordOpen && (
