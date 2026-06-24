@@ -11,6 +11,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { to: "/dashboard", label: "Family Dashboard", icon: "dashboard" },
+  { to: "/admin-console", label: "Admin Console", icon: "admin_panel_settings" },
   { to: "/admin", label: "Officer Console", icon: "shield_person" },
   { to: "/ledger", label: "Aid Ledger", icon: "inventory_2" },
   { to: "/support", label: "Support Request", icon: "support_agent" },
@@ -52,6 +53,7 @@ export function AppShell({ title, subtitle, actions, children }: AppShellProps) 
           </p>
           {NAV.filter((n) => {
             if (n.to === "/admin") return auth.isOfficer || auth.isAdmin;
+            if (n.to === "/admin-console") return auth.isAdmin;
             return true;
           }).map((n) => {
             const active = pathname === n.to || pathname.startsWith(n.to + "/");
