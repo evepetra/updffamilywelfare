@@ -1,11 +1,7 @@
 # UPDF Family Welfare Portal
 
-[![Security Gate](https://github.com/OWNER/REPO/actions/workflows/security-scan.yml/badge.svg?branch=main&event=push)](https://github.com/OWNER/REPO/actions/workflows/security-scan.yml?query=branch%3Amain)
-[![Wiz Scan](https://github.com/OWNER/REPO/actions/workflows/security-scan.yml/badge.svg?branch=main&event=push&job=wiz-scan)](https://github.com/OWNER/REPO/actions/workflows/security-scan.yml?query=branch%3Amain)
-[![Aikido Scan](https://github.com/OWNER/REPO/actions/workflows/security-scan.yml/badge.svg?branch=main&event=push&job=aikido-scan)](https://github.com/OWNER/REPO/actions/workflows/security-scan.yml?query=branch%3Amain)
 
-> Replace `OWNER/REPO` above with your GitHub org and repository slug
-> (e.g. `updf/family-welfare-portal`) after connecting the project to GitHub.
+[Github Link: ](https://github.com/evepetra/updffamilywelfare.git)
 
 A welfare support portal for Uganda People's Defence Force families: support
 requests, document uploads, aid ledger, role-based admin tooling.
