@@ -166,6 +166,41 @@ export type Database = {
           },
         ]
       }
+      request_status_audit: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          id: string
+          new_status: string
+          old_status: string | null
+          request_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          new_status: string
+          old_status?: string | null
+          request_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          new_status?: string
+          old_status?: string | null
+          request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "request_status_audit_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "support_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_change_audit: {
         Row: {
           action: string
