@@ -22,9 +22,14 @@ export type Database = {
           created_by: string | null
           disbursed_at: string | null
           id: string
+          payout_account_name: string | null
+          payout_account_number: string | null
+          payout_method: string | null
+          payout_provider: string | null
           recipient_name: string
           recipient_user_id: string | null
           region: string
+          request_id: string | null
           status: string
           updated_at: string
         }
@@ -35,9 +40,14 @@ export type Database = {
           created_by?: string | null
           disbursed_at?: string | null
           id?: string
+          payout_account_name?: string | null
+          payout_account_number?: string | null
+          payout_method?: string | null
+          payout_provider?: string | null
           recipient_name: string
           recipient_user_id?: string | null
           region: string
+          request_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -48,13 +58,26 @@ export type Database = {
           created_by?: string | null
           disbursed_at?: string | null
           id?: string
+          payout_account_name?: string | null
+          payout_account_number?: string | null
+          payout_method?: string | null
+          payout_provider?: string | null
           recipient_name?: string
           recipient_user_id?: string | null
           region?: string
+          request_id?: string | null
           status?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "aid_ledger_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "support_requests"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       login_audit: {
         Row: {
@@ -99,6 +122,10 @@ export type Database = {
           full_name: string | null
           id: string
           nin: string | null
+          payout_account_name: string | null
+          payout_account_number: string | null
+          payout_method: string | null
+          payout_provider: string | null
           rank: string | null
           service_number: string | null
           updated_at: string
@@ -109,6 +136,10 @@ export type Database = {
           full_name?: string | null
           id: string
           nin?: string | null
+          payout_account_name?: string | null
+          payout_account_number?: string | null
+          payout_method?: string | null
+          payout_provider?: string | null
           rank?: string | null
           service_number?: string | null
           updated_at?: string
@@ -119,6 +150,10 @@ export type Database = {
           full_name?: string | null
           id?: string
           nin?: string | null
+          payout_account_name?: string | null
+          payout_account_number?: string | null
+          payout_method?: string | null
+          payout_provider?: string | null
           rank?: string | null
           service_number?: string | null
           updated_at?: string
@@ -230,6 +265,7 @@ export type Database = {
       }
       support_requests: {
         Row: {
+          amount_approved: number | null
           created_at: string
           details: string | null
           id: string
@@ -241,6 +277,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          amount_approved?: number | null
           created_at?: string
           details?: string | null
           id?: string
@@ -252,6 +289,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          amount_approved?: number | null
           created_at?: string
           details?: string | null
           id?: string
