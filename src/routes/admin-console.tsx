@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
 import { supabase } from "@/integrations/supabase/client";
-import { requireAdmin } from "@/lib/auth/roles.functions";
+import { adminListUsers, requireAdmin } from "@/lib/auth/roles.functions";
 
 type AppRole = "family" | "officer" | "admin";
 type AdminUserRow = {
@@ -65,13 +65,8 @@ function AdminConsole() {
   const usersQuery = useQuery({
     queryKey: ["admin-users-list"],
     queryFn: async () => {
-      const { data, error } = await (supabase.rpc as unknown as (
-        fn: string,
-      ) => Promise<{ data: AdminUserRow[] | null; error: { message: string } | null }>)(
-        "admin_list_users",
-      );
-      if (error) throw new Error(error.message);
-      return data ?? [];
+      const data = await adminListUsers();
+      return (data ?? []) as AdminUserRow[];
     },
   });
 
