@@ -132,7 +132,7 @@ function AdminConsole() {
       recipient_user_id: row.user_id,
       request_id: row.id,
       aid_type: row.request_type,
-      amount: row.amount_approved,
+      amount: row.amount_approved ?? 0,
       status: "disbursed",
       payout_method: p.payout_method,
       payout_provider: p.payout_provider,
