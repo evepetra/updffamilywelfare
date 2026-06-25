@@ -90,15 +90,30 @@ function AdminConsole() {
   const disbursalsQuery = useQuery({
     queryKey: ["pending-disbursals"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: reqs, error: rErr } = await supabase
         .from("support_requests")
-        .select(
-          "id, title, request_type, amount_approved, user_id, updated_at, profiles!support_requests_user_id_fkey ( full_name, service_number, payout_method, payout_provider, payout_account_name, payout_account_number )",
-        )
+        .select("id, title, request_type, amount_approved, user_id, updated_at")
         .eq("status", "approved")
         .order("updated_at", { ascending: true });
-      if (error) throw error;
-      return (data ?? []) as unknown as DisbursalRow[];
+      if (rErr) throw rErr;
+      const userIds = Array.from(new Set((reqs ?? []).map((r) => r.user_id)));
+      let profilesById = new Map<string, DisbursalRow["profiles"]>();
+      if (userIds.length) {
+        const { data: profs, error: pErr } = await supabase
+          .from("profiles")
+          .select("id, full_name, service_number, payout_method, payout_provider, payout_account_name, payout_account_number")
+          .in("id", userIds);
+        if (pErr) throw pErr;
+        profilesById = new Map((profs ?? []).map((p) => [p.id, {
+          full_name: p.full_name,
+          service_number: p.service_number,
+          payout_method: p.payout_method,
+          payout_provider: p.payout_provider,
+          payout_account_name: p.payout_account_name,
+          payout_account_number: p.payout_account_number,
+        }]));
+      }
+      return (reqs ?? []).map((r) => ({ ...r, profiles: profilesById.get(r.user_id) ?? null })) as DisbursalRow[];
     },
   });
   const [disbursingId, setDisbursingId] = useState<string | null>(null);
