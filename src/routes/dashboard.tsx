@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,6 +30,21 @@ export const Route = createFileRoute("/dashboard")({
 
 function FamilyDashboard() {
   const { user, profile } = useAuth();
+  const qc = useQueryClient();
+
+  const payoutQuery = useQuery({
+    queryKey: ["my-payout", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("payout_method, payout_provider, payout_account_name, payout_account_number")
+        .eq("id", user!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const requestsQuery = useQuery({
     queryKey: ["my-requests", user?.id],
@@ -81,6 +97,14 @@ function FamilyDashboard() {
       }
     >
       <div className="grid grid-cols-12 gap-6">
+        <section className="col-span-12 bg-card rounded-lg border border-outline-variant border-l-4 border-l-primary p-6">
+          <PayoutAccountCard
+            userId={user?.id ?? ""}
+            initial={payoutQuery.data ?? null}
+            onSaved={() => qc.invalidateQueries({ queryKey: ["my-payout"] })}
+          />
+        </section>
+
         {/* Active aid request */}
         <section className="col-span-12 lg:col-span-8 bg-card rounded-lg border border-outline-variant border-l-4 border-l-secondary p-6">
           <div className="flex justify-between items-start mb-6 gap-4">
