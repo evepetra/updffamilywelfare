@@ -70,6 +70,90 @@ function AdminConsole() {
     },
   });
 
+  // ---- Pending Disbursals (approved requests awaiting administrator payout) ----
+  type DisbursalRow = {
+    id: string;
+    title: string;
+    request_type: string;
+    amount_approved: number | null;
+    user_id: string;
+    updated_at: string;
+    profiles: {
+      full_name: string | null;
+      service_number: string | null;
+      payout_method: string | null;
+      payout_provider: string | null;
+      payout_account_name: string | null;
+      payout_account_number: string | null;
+    } | null;
+  };
+  const disbursalsQuery = useQuery({
+    queryKey: ["pending-disbursals"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("support_requests")
+        .select(
+          "id, title, request_type, amount_approved, user_id, updated_at, profiles!support_requests_user_id_fkey ( full_name, service_number, payout_method, payout_provider, payout_account_name, payout_account_number )",
+        )
+        .eq("status", "approved")
+        .order("updated_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as unknown as DisbursalRow[];
+    },
+  });
+  const [disbursingId, setDisbursingId] = useState<string | null>(null);
+  const [disbursalError, setDisbursalError] = useState<string | null>(null);
+
+  async function disburse(row: DisbursalRow) {
+    setDisbursalError(null);
+    const p = row.profiles;
+    if (!p?.payout_account_number || !p?.payout_provider) {
+      setDisbursalError(
+        `Cannot disburse: ${p?.full_name ?? "recipient"} has no deposit account on file. Ask them to set one in their dashboard.`,
+      );
+      return;
+    }
+    const amt = row.amount_approved ?? 0;
+    if (!amt || amt <= 0) {
+      const raw = window.prompt("Enter amount to disburse (UGX):", "");
+      if (raw == null) return;
+      const parsed = Number(raw.replace(/[^0-9.]/g, ""));
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        setDisbursalError("Invalid amount.");
+        return;
+      }
+      row.amount_approved = parsed;
+    }
+    if (!window.confirm(
+      `Disburse UGX ${(row.amount_approved ?? 0).toLocaleString()} to ${p.full_name} (${p.payout_provider} • ${p.payout_account_number})?`,
+    )) return;
+    setDisbursingId(row.id);
+    const { error: insErr } = await supabase.from("aid_ledger").insert({
+      recipient_user_id: row.user_id,
+      request_id: row.id,
+      aid_type: row.request_type,
+      amount: row.amount_approved,
+      status: "disbursed",
+      payout_method: p.payout_method,
+      payout_provider: p.payout_provider,
+      payout_account_name: p.payout_account_name,
+      payout_account_number: p.payout_account_number,
+      notes: `Disbursed for request: ${row.title}`,
+    });
+    if (insErr) {
+      setDisbursingId(null);
+      setDisbursalError(insErr.message);
+      return;
+    }
+    await supabase.from("support_requests").update({ status: "completed" }).eq("id", row.id);
+    setDisbursingId(null);
+    qc.invalidateQueries({ queryKey: ["pending-disbursals"] });
+    qc.invalidateQueries({ queryKey: ["admin-requests"] });
+    qc.invalidateQueries({ queryKey: ["my-requests"] });
+    qc.invalidateQueries({ queryKey: ["admin-ledger"] });
+    qc.invalidateQueries({ queryKey: ["ledger"] });
+  }
+
   const auditQuery = useQuery({
     queryKey: ["admin-role-audit", auditPage, auditRoleFilter],
     queryFn: async () => {
