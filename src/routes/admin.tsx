@@ -193,9 +193,13 @@ function AdminDashboard() {
     status: string,
     extra?: { amount_approved?: number | null },
   ) {
-    const patch: Record<string, unknown> = { status };
-    if (extra && "amount_approved" in extra) patch.amount_approved = extra.amount_approved;
-    await supabase.from("support_requests").update(patch).eq("id", id);
+    await supabase
+      .from("support_requests")
+      .update({
+        status,
+        ...(extra && "amount_approved" in extra ? { amount_approved: extra.amount_approved } : {}),
+      })
+      .eq("id", id);
     qc.invalidateQueries({ queryKey: ["admin-requests"] });
     qc.invalidateQueries({ queryKey: ["my-requests"] });
     qc.invalidateQueries({ queryKey: ["status-audit"] });
@@ -502,16 +506,6 @@ function AdminDashboard() {
         )}
       </div>
 
-      {recordOpen && (
-        <RecordDisbursalDialog
-          onClose={() => setRecordOpen(false)}
-          onSaved={() => {
-            setRecordOpen(false);
-            qc.invalidateQueries({ queryKey: ["admin-ledger"] });
-            qc.invalidateQueries({ queryKey: ["ledger"] });
-          }}
-        />
-      )}
     </AppShell>
   );
 }
