@@ -425,7 +425,7 @@ function AdminConsole() {
             <div>
               <h2 className="text-lg font-semibold text-primary">Role Assignment Toolkit</h2>
               <p className="text-xs text-on-surface-variant">
-                Toggle Admin, Soldier (Officer), or Family on any account. Users can hold multiple roles.
+                Toggle Admin, Welfare Officer, or Family on any account. Users can hold multiple roles.
               </p>
             </div>
             <input
