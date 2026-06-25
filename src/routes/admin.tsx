@@ -94,7 +94,6 @@ export const Route = createFileRoute("/admin")({
 function AdminDashboard() {
   const auth = useAuth();
   const qc = useQueryClient();
-  const [recordOpen, setRecordOpen] = useState(false);
   const [pendingOnly, setPendingOnly] = useState(false);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -189,11 +188,36 @@ function AdminDashboard() {
       .slice(0, 6);
   }, [ledger]);
 
-  async function updateStatus(id: string, status: string) {
-    await supabase.from("support_requests").update({ status }).eq("id", id);
+  async function updateStatus(
+    id: string,
+    status: string,
+    extra?: { amount_approved?: number | null },
+  ) {
+    await supabase
+      .from("support_requests")
+      .update({
+        status,
+        ...(extra && "amount_approved" in extra ? { amount_approved: extra.amount_approved } : {}),
+      })
+      .eq("id", id);
     qc.invalidateQueries({ queryKey: ["admin-requests"] });
     qc.invalidateQueries({ queryKey: ["my-requests"] });
     qc.invalidateQueries({ queryKey: ["status-audit"] });
+    qc.invalidateQueries({ queryKey: ["pending-disbursals"] });
+  }
+
+  async function approveWithAmount(id: string) {
+    const raw = window.prompt(
+      "Enter approved aid amount in UGX (the administrator will disburse it):",
+      "",
+    );
+    if (raw == null) return;
+    const amt = Number(raw.replace(/[^0-9.]/g, ""));
+    if (!Number.isFinite(amt) || amt <= 0) {
+      window.alert("Please enter a valid positive amount.");
+      return;
+    }
+    await updateStatus(id, "approved", { amount_approved: amt });
   }
 
   if (auth.loading) return null;
@@ -231,13 +255,15 @@ function AdminDashboard() {
             <Icon name="receipt_long" className="text-[18px]" />
             Open Ledger
           </Link>
-          <button
-            onClick={() => setRecordOpen(true)}
-            className="inline-flex items-center gap-2 bg-primary text-on-primary px-4 py-2.5 rounded-md text-sm font-semibold hover:bg-primary-container"
-          >
-            <Icon name="add" className="text-[18px]" />
-            Record Disbursal
-          </button>
+          {auth.isAdmin && (
+            <Link
+              to="/admin-console"
+              className="inline-flex items-center gap-2 bg-primary text-on-primary px-4 py-2.5 rounded-md text-sm font-semibold hover:bg-primary-container"
+            >
+              <Icon name="payments" className="text-[18px]" />
+              Disbursal Console
+            </Link>
+          )}
         </>
       }
     >
@@ -389,7 +415,7 @@ function AdminDashboard() {
                     <td className="px-5 py-4 text-right">
                       <div className="inline-flex items-center gap-1.5 justify-end">
                         <button
-                          onClick={() => updateStatus(r.id, "approved")}
+                          onClick={() => approveWithAmount(r.id)}
                           disabled={r.status === "approved" || r.status === "completed"}
                           className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded bg-primary text-on-primary hover:bg-primary-container disabled:opacity-40"
                         >
@@ -403,14 +429,6 @@ function AdminDashboard() {
                         >
                           <Icon name="close" className="text-[14px]" />
                           Reject
-                        </button>
-                        <button
-                          onClick={() => updateStatus(r.id, "completed")}
-                          disabled={r.status === "completed"}
-                          title="Mark complete"
-                          className="inline-flex items-center px-2 py-1 text-xs rounded border border-outline-variant hover:bg-surface-container disabled:opacity-40"
-                        >
-                          <Icon name="task_alt" className="text-[14px]" />
                         </button>
                       </div>
                     </td>
@@ -488,16 +506,6 @@ function AdminDashboard() {
         )}
       </div>
 
-      {recordOpen && (
-        <RecordDisbursalDialog
-          onClose={() => setRecordOpen(false)}
-          onSaved={() => {
-            setRecordOpen(false);
-            qc.invalidateQueries({ queryKey: ["admin-ledger"] });
-            qc.invalidateQueries({ queryKey: ["ledger"] });
-          }}
-        />
-      )}
     </AppShell>
   );
 }

@@ -9,14 +9,14 @@ interface NavItem {
   icon: string;
 }
 
-const NAV: NavItem[] = [
-  { to: "/dashboard", label: "Family Dashboard", icon: "dashboard" },
-  { to: "/admin-console", label: "Admin Console", icon: "admin_panel_settings" },
-  { to: "/admin", label: "Officer Console", icon: "shield_person" },
-  { to: "/ledger", label: "Aid Ledger", icon: "inventory_2" },
-  { to: "/support", label: "Support Request", icon: "support_agent" },
-  { to: "/reports", label: "Reporting Tools", icon: "analytics" },
-  { to: "/manual", label: "User Manual", icon: "menu_book" },
+const NAV: (NavItem & { roles: ("family" | "officer" | "admin")[] })[] = [
+  { to: "/dashboard",      label: "Family Dashboard",  icon: "dashboard",                roles: ["family", "admin"] },
+  { to: "/admin-console",  label: "Admin Console",     icon: "admin_panel_settings",     roles: ["admin"] },
+  { to: "/admin",          label: "Welfare Officer Console", icon: "shield_person",      roles: ["officer", "admin"] },
+  { to: "/ledger",         label: "Aid Ledger",        icon: "inventory_2",              roles: ["officer", "admin"] },
+  { to: "/support",        label: "Support Request",   icon: "support_agent",            roles: ["family", "admin"] },
+  { to: "/reports",        label: "Reporting Tools",   icon: "analytics",                roles: ["admin"] },
+  { to: "/manual",         label: "User Manual",       icon: "menu_book",                roles: ["family", "officer", "admin"] },
 ];
 
 interface AppShellProps {
@@ -43,7 +43,7 @@ export function AppShell({ title, subtitle, actions, children }: AppShellProps) 
       <TopBar
         name={auth.profile?.full_name || auth.user?.email || "User"}
         serviceNumber={auth.profile?.service_number || ""}
-        roleLabel={auth.isAdmin ? "Admin" : auth.isOfficer ? "Officer" : "Family"}
+        roleLabel={auth.isAdmin ? "Administrator" : auth.isOfficer ? "Welfare Officer" : "Family Member"}
         onSignOut={auth.signOut}
       />
       <div className="flex-1 flex w-full">
@@ -51,11 +51,11 @@ export function AppShell({ title, subtitle, actions, children }: AppShellProps) 
           <p className="font-medium text-xs uppercase tracking-widest text-outline px-3 mb-2">
             Navigation
           </p>
-          {NAV.filter((n) => {
-            if (n.to === "/admin") return auth.isOfficer || auth.isAdmin;
-            if (n.to === "/admin-console") return auth.isAdmin;
-            return true;
-          }).map((n) => {
+          {NAV.filter((n) =>
+            n.roles.some((r) =>
+              r === "admin" ? auth.isAdmin : r === "officer" ? auth.isOfficer : auth.isFamily,
+            ),
+          ).map((n) => {
             const active = pathname === n.to || pathname.startsWith(n.to + "/");
             return (
               <Link
@@ -74,13 +74,15 @@ export function AppShell({ title, subtitle, actions, children }: AppShellProps) 
             );
           })}
           <div className="mt-auto border-t border-outline-variant pt-4">
-            <Link
-              to="/support"
-              className="flex items-center justify-center gap-2 bg-primary text-on-primary px-4 py-3 rounded-md text-sm font-semibold hover:bg-primary-container transition-colors"
-            >
-              <Icon name="add" className="text-[20px]" />
-              New Support Request
-            </Link>
+            {(auth.isFamily || auth.isAdmin) && (
+              <Link
+                to="/support"
+                className="flex items-center justify-center gap-2 bg-primary text-on-primary px-4 py-3 rounded-md text-sm font-semibold hover:bg-primary-container transition-colors"
+              >
+                <Icon name="add" className="text-[20px]" />
+                New Support Request
+              </Link>
+            )}
             <button
               onClick={auth.signOut}
               className="mt-2 flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-on-surface-variant hover:bg-surface-container"
@@ -118,7 +120,7 @@ export function AppShell({ title, subtitle, actions, children }: AppShellProps) 
                       }
                       className="text-[13px]"
                     />
-                    {r === "officer" ? "Soldier" : r.charAt(0).toUpperCase() + r.slice(1)}
+                    {r === "officer" ? "Welfare Officer" : r.charAt(0).toUpperCase() + r.slice(1)}
                   </span>
                 ))}
               </div>
@@ -201,12 +203,25 @@ function TopBar({
 }
 
 function MobileNav({ pathname }: { pathname: string }) {
-  const items: NavItem[] = [
-    { to: "/dashboard", label: "Home", icon: "dashboard" },
-    { to: "/ledger", label: "Aid", icon: "inventory_2" },
-    { to: "/support", label: "Request", icon: "support_agent" },
-    { to: "/reports", label: "Reports", icon: "analytics" },
-  ];
+  const auth = useAuth();
+  const items: NavItem[] = auth.isAdmin
+    ? [
+        { to: "/admin-console", label: "Admin", icon: "admin_panel_settings" },
+        { to: "/admin", label: "Officer", icon: "shield_person" },
+        { to: "/ledger", label: "Ledger", icon: "inventory_2" },
+        { to: "/dashboard", label: "Family", icon: "dashboard" },
+      ]
+    : auth.isOfficer
+      ? [
+          { to: "/admin", label: "Console", icon: "shield_person" },
+          { to: "/ledger", label: "Ledger", icon: "inventory_2" },
+          { to: "/manual", label: "Manual", icon: "menu_book" },
+        ]
+      : [
+          { to: "/dashboard", label: "Home", icon: "dashboard" },
+          { to: "/support", label: "Request", icon: "support_agent" },
+          { to: "/manual", label: "Manual", icon: "menu_book" },
+        ];
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 bg-surface-container-lowest border-t border-outline-variant h-16 flex justify-around items-center z-40">
       {items.map((n) => {

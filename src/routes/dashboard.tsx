@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,6 +30,21 @@ export const Route = createFileRoute("/dashboard")({
 
 function FamilyDashboard() {
   const { user, profile } = useAuth();
+  const qc = useQueryClient();
+
+  const payoutQuery = useQuery({
+    queryKey: ["my-payout", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("payout_method, payout_provider, payout_account_name, payout_account_number")
+        .eq("id", user!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const requestsQuery = useQuery({
     queryKey: ["my-requests", user?.id],
@@ -81,6 +97,14 @@ function FamilyDashboard() {
       }
     >
       <div className="grid grid-cols-12 gap-6">
+        <section className="col-span-12 bg-card rounded-lg border border-outline-variant border-l-4 border-l-primary p-6">
+          <PayoutAccountCard
+            userId={user?.id ?? ""}
+            initial={payoutQuery.data ?? null}
+            onSaved={() => qc.invalidateQueries({ queryKey: ["my-payout"] })}
+          />
+        </section>
+
         {/* Active aid request */}
         <section className="col-span-12 lg:col-span-8 bg-card rounded-lg border border-outline-variant border-l-4 border-l-secondary p-6">
           <div className="flex justify-between items-start mb-6 gap-4">
@@ -278,6 +302,169 @@ function Stat({ label, value }: { label: string; value: string }) {
         {label}
       </p>
       <p className="text-xl font-bold text-primary">{value}</p>
+    </div>
+  );
+}
+
+type PayoutInfo = {
+  payout_method: string | null;
+  payout_provider: string | null;
+  payout_account_name: string | null;
+  payout_account_number: string | null;
+} | null;
+
+function PayoutAccountCard({
+  userId,
+  initial,
+  onSaved,
+}: {
+  userId: string;
+  initial: PayoutInfo;
+  onSaved: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [method, setMethod] = useState<string>(initial?.payout_method ?? "bank");
+  const [provider, setProvider] = useState<string>(initial?.payout_provider ?? "");
+  const [accName, setAccName] = useState<string>(initial?.payout_account_name ?? "");
+  const [accNum, setAccNum] = useState<string>(initial?.payout_account_number ?? "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMethod(initial?.payout_method ?? "bank");
+    setProvider(initial?.payout_provider ?? "");
+    setAccName(initial?.payout_account_name ?? "");
+    setAccNum(initial?.payout_account_number ?? "");
+  }, [initial]);
+
+  const hasAccount = !!(initial?.payout_account_number && initial?.payout_provider);
+
+  async function save() {
+    if (!userId) return;
+    setBusy(true);
+    setErr(null);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        payout_method: method,
+        payout_provider: provider.trim() || null,
+        payout_account_name: accName.trim() || null,
+        payout_account_number: accNum.trim() || null,
+      })
+      .eq("id", userId);
+    setBusy(false);
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+    setEditing(false);
+    onSaved();
+  }
+
+  return (
+    <div>
+      <div className="flex justify-between items-start mb-4 gap-3">
+        <div>
+          <h2 className="text-xl font-semibold text-primary flex items-center gap-2">
+            <Icon name="account_balance" fill className="text-[22px]" />
+            Aid Deposit Account
+          </h2>
+          <p className="text-xs text-on-surface-variant mt-0.5">
+            Approved aid is deposited to this account by the administrator.
+          </p>
+        </div>
+        {!editing && (
+          <button
+            onClick={() => setEditing(true)}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary border border-primary px-3 py-1.5 rounded-md hover:bg-primary hover:text-on-primary"
+          >
+            <Icon name={hasAccount ? "edit" : "add"} className="text-[16px]" />
+            {hasAccount ? "Update" : "Add account"}
+          </button>
+        )}
+      </div>
+      {!editing ? (
+        hasAccount ? (
+          <dl className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <Field label="Method" value={initial?.payout_method === "mobile_money" ? "Mobile Money" : "Bank"} />
+            <Field label={initial?.payout_method === "mobile_money" ? "Carrier" : "Bank"} value={initial?.payout_provider ?? "—"} />
+            <Field label="Account name" value={initial?.payout_account_name ?? "—"} />
+            <Field label="Account number" value={initial?.payout_account_number ?? "—"} mono />
+          </dl>
+        ) : (
+          <p className="text-sm text-on-surface-variant">
+            No deposit account on file. Add one so welfare aid can be transferred to you.
+          </p>
+        )
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <label className="text-xs">
+            <span className="block mb-1 text-on-surface-variant">Method</span>
+            <select
+              value={method}
+              onChange={(e) => setMethod(e.target.value)}
+              className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+            >
+              <option value="bank">Bank account</option>
+              <option value="mobile_money">Mobile Money</option>
+            </select>
+          </label>
+          <label className="text-xs">
+            <span className="block mb-1 text-on-surface-variant">
+              {method === "mobile_money" ? "Carrier (MTN, Airtel…)" : "Bank name"}
+            </span>
+            <input
+              value={provider}
+              onChange={(e) => setProvider(e.target.value)}
+              className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+            />
+          </label>
+          <label className="text-xs">
+            <span className="block mb-1 text-on-surface-variant">Account name</span>
+            <input
+              value={accName}
+              onChange={(e) => setAccName(e.target.value)}
+              className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+            />
+          </label>
+          <label className="text-xs">
+            <span className="block mb-1 text-on-surface-variant">
+              {method === "mobile_money" ? "Mobile number" : "Account number"}
+            </span>
+            <input
+              value={accNum}
+              onChange={(e) => setAccNum(e.target.value)}
+              className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+            />
+          </label>
+          {err && <p className="md:col-span-2 text-sm text-error">{err}</p>}
+          <div className="md:col-span-2 flex justify-end gap-2 mt-1">
+            <button
+              onClick={() => setEditing(false)}
+              disabled={busy}
+              className="px-4 py-2 text-sm border border-outline-variant rounded-md hover:bg-surface-container"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              disabled={busy}
+              className="px-4 py-2 text-sm font-semibold bg-primary text-on-primary rounded-md hover:bg-primary-container disabled:opacity-50"
+            >
+              {busy ? "Saving…" : "Save account"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div>
+      <dt className="text-[10px] uppercase tracking-wider text-outline font-medium">{label}</dt>
+      <dd className={"mt-0.5 text-on-surface " + (mono ? "font-mono text-sm" : "")}>{value}</dd>
     </div>
   );
 }

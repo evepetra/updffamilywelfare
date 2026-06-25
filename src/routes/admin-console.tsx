@@ -70,6 +70,107 @@ function AdminConsole() {
     },
   });
 
+  // ---- Pending Disbursals (approved requests awaiting administrator payout) ----
+  type DisbursalRow = {
+    id: string;
+    title: string;
+    request_type: string;
+    amount_approved: number | null;
+    user_id: string;
+    updated_at: string;
+    profiles: {
+      full_name: string | null;
+      service_number: string | null;
+      payout_method: string | null;
+      payout_provider: string | null;
+      payout_account_name: string | null;
+      payout_account_number: string | null;
+    } | null;
+  };
+  const disbursalsQuery = useQuery({
+    queryKey: ["pending-disbursals"],
+    queryFn: async () => {
+      const { data: reqs, error: rErr } = await supabase
+        .from("support_requests")
+        .select("id, title, request_type, amount_approved, user_id, updated_at")
+        .eq("status", "approved")
+        .order("updated_at", { ascending: true });
+      if (rErr) throw rErr;
+      const userIds = Array.from(new Set((reqs ?? []).map((r) => r.user_id)));
+      let profilesById = new Map<string, DisbursalRow["profiles"]>();
+      if (userIds.length) {
+        const { data: profs, error: pErr } = await supabase
+          .from("profiles")
+          .select("id, full_name, service_number, payout_method, payout_provider, payout_account_name, payout_account_number")
+          .in("id", userIds);
+        if (pErr) throw pErr;
+        profilesById = new Map((profs ?? []).map((p) => [p.id, {
+          full_name: p.full_name,
+          service_number: p.service_number,
+          payout_method: p.payout_method,
+          payout_provider: p.payout_provider,
+          payout_account_name: p.payout_account_name,
+          payout_account_number: p.payout_account_number,
+        }]));
+      }
+      return (reqs ?? []).map((r) => ({ ...r, profiles: profilesById.get(r.user_id) ?? null })) as DisbursalRow[];
+    },
+  });
+  const [disbursingId, setDisbursingId] = useState<string | null>(null);
+  const [disbursalError, setDisbursalError] = useState<string | null>(null);
+
+  async function disburse(row: DisbursalRow) {
+    setDisbursalError(null);
+    const p = row.profiles;
+    if (!p?.payout_account_number || !p?.payout_provider) {
+      setDisbursalError(
+        `Cannot disburse: ${p?.full_name ?? "recipient"} has no deposit account on file. Ask them to set one in their dashboard.`,
+      );
+      return;
+    }
+    const amt = row.amount_approved ?? 0;
+    if (!amt || amt <= 0) {
+      const raw = window.prompt("Enter amount to disburse (UGX):", "");
+      if (raw == null) return;
+      const parsed = Number(raw.replace(/[^0-9.]/g, ""));
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        setDisbursalError("Invalid amount.");
+        return;
+      }
+      row.amount_approved = parsed;
+    }
+    if (!window.confirm(
+      `Disburse UGX ${(row.amount_approved ?? 0).toLocaleString()} to ${p.full_name} (${p.payout_provider} • ${p.payout_account_number})?`,
+    )) return;
+    setDisbursingId(row.id);
+    const { error: insErr } = await supabase.from("aid_ledger").insert({
+      recipient_user_id: row.user_id,
+      recipient_name: p.full_name ?? "Unknown",
+      region: "—",
+      request_id: row.id,
+      aid_type: row.request_type,
+      amount: row.amount_approved ?? 0,
+      status: "disbursed",
+      disbursed_at: new Date().toISOString(),
+      payout_method: p.payout_method,
+      payout_provider: p.payout_provider,
+      payout_account_name: p.payout_account_name,
+      payout_account_number: p.payout_account_number,
+    });
+    if (insErr) {
+      setDisbursingId(null);
+      setDisbursalError(insErr.message);
+      return;
+    }
+    await supabase.from("support_requests").update({ status: "completed" }).eq("id", row.id);
+    setDisbursingId(null);
+    qc.invalidateQueries({ queryKey: ["pending-disbursals"] });
+    qc.invalidateQueries({ queryKey: ["admin-requests"] });
+    qc.invalidateQueries({ queryKey: ["my-requests"] });
+    qc.invalidateQueries({ queryKey: ["admin-ledger"] });
+    qc.invalidateQueries({ queryKey: ["ledger"] });
+  }
+
   const auditQuery = useQuery({
     queryKey: ["admin-role-audit", auditPage, auditRoleFilter],
     queryFn: async () => {
@@ -229,9 +330,94 @@ function AdminConsole() {
     >
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         <KpiCard label="Administrators" value={String(admins)} icon="admin_panel_settings" tone="bg-primary text-on-primary" />
-        <KpiCard label="Officers (Soldiers)" value={String(officers)} icon="military_tech" tone="bg-secondary text-on-secondary" />
+        <KpiCard label="Welfare Officers" value={String(officers)} icon="military_tech" tone="bg-secondary text-on-secondary" />
         <KpiCard label="Family Accounts" value={String(families)} icon="family_restroom" tone="bg-tertiary text-on-tertiary" />
       </div>
+
+      {/* Pending Disbursals — administrator-only payouts */}
+      <section className="mb-8 bg-card border-2 border-primary/30 rounded-lg overflow-hidden">
+        <div className="px-5 py-4 border-b border-outline-variant flex items-center justify-between bg-primary-fixed-dim/30">
+          <div>
+            <h2 className="text-lg font-semibold text-primary flex items-center gap-2">
+              <Icon name="payments" fill className="text-[20px]" />
+              Pending Disbursals
+            </h2>
+            <p className="text-xs text-on-surface-variant">
+              Requests approved by welfare officers. Only administrators can release funds to recipient accounts.
+            </p>
+          </div>
+          <span className="text-xs px-2.5 py-1 rounded-full bg-primary text-on-primary font-semibold">
+            {disbursalsQuery.data?.length ?? 0} awaiting
+          </span>
+        </div>
+        {disbursalError && (
+          <div className="px-5 py-2 text-xs text-error bg-error-container/40 border-b border-error/30">
+            {disbursalError}
+          </div>
+        )}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-surface-container-low text-xs uppercase text-on-surface-variant">
+              <tr>
+                <th className="px-5 py-3 text-left">Recipient</th>
+                <th className="px-5 py-3 text-left">Request</th>
+                <th className="px-5 py-3 text-left">Amount (UGX)</th>
+                <th className="px-5 py-3 text-left">Deposit account</th>
+                <th className="px-5 py-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-outline-variant">
+              {disbursalsQuery.isLoading && (
+                <tr><td colSpan={5} className="px-5 py-6 text-center text-on-surface-variant">Loading…</td></tr>
+              )}
+              {disbursalsQuery.data?.length === 0 && (
+                <tr><td colSpan={5} className="px-5 py-6 text-center text-on-surface-variant">
+                  Nothing to disburse. Approved requests will appear here.
+                </td></tr>
+              )}
+              {disbursalsQuery.data?.map((row) => {
+                const p = row.profiles;
+                const hasAcc = !!(p?.payout_account_number && p?.payout_provider);
+                return (
+                  <tr key={row.id} className="hover:bg-surface-container/40">
+                    <td className="px-5 py-3">
+                      <div className="font-medium">{p?.full_name ?? "Unknown"}</div>
+                      <div className="text-xs text-on-surface-variant font-mono">{p?.service_number ?? "—"}</div>
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="font-medium">{row.title}</div>
+                      <div className="text-xs text-on-surface-variant capitalize">{row.request_type}</div>
+                    </td>
+                    <td className="px-5 py-3 font-mono">
+                      {row.amount_approved ? row.amount_approved.toLocaleString() : <span className="text-on-surface-variant">— ask</span>}
+                    </td>
+                    <td className="px-5 py-3">
+                      {hasAcc ? (
+                        <div className="text-xs">
+                          <div className="font-medium capitalize">{p?.payout_method === "mobile_money" ? "Mobile Money" : "Bank"} · {p?.payout_provider}</div>
+                          <div className="font-mono text-on-surface-variant">{p?.payout_account_number}</div>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-error">No account on file</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <button
+                        disabled={!hasAcc || disbursingId === row.id}
+                        onClick={() => disburse(row)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded bg-primary text-on-primary hover:bg-primary-container disabled:opacity-40"
+                      >
+                        <Icon name="send_money" className="text-[14px]" />
+                        {disbursingId === row.id ? "Disbursing…" : "Disburse"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <div className="grid grid-cols-12 gap-6">
         <section className="col-span-12 lg:col-span-8 bg-card border border-outline-variant rounded-lg overflow-hidden">
@@ -239,7 +425,7 @@ function AdminConsole() {
             <div>
               <h2 className="text-lg font-semibold text-primary">Role Assignment Toolkit</h2>
               <p className="text-xs text-on-surface-variant">
-                Toggle Admin, Soldier (Officer), or Family on any account. Users can hold multiple roles.
+                Toggle Admin, Welfare Officer, or Family on any account. Users can hold multiple roles.
               </p>
             </div>
             <input
