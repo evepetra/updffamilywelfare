@@ -315,9 +315,94 @@ function AdminConsole() {
     >
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         <KpiCard label="Administrators" value={String(admins)} icon="admin_panel_settings" tone="bg-primary text-on-primary" />
-        <KpiCard label="Officers (Soldiers)" value={String(officers)} icon="military_tech" tone="bg-secondary text-on-secondary" />
+        <KpiCard label="Welfare Officers" value={String(officers)} icon="military_tech" tone="bg-secondary text-on-secondary" />
         <KpiCard label="Family Accounts" value={String(families)} icon="family_restroom" tone="bg-tertiary text-on-tertiary" />
       </div>
+
+      {/* Pending Disbursals — administrator-only payouts */}
+      <section className="mb-8 bg-card border-2 border-primary/30 rounded-lg overflow-hidden">
+        <div className="px-5 py-4 border-b border-outline-variant flex items-center justify-between bg-primary-fixed-dim/30">
+          <div>
+            <h2 className="text-lg font-semibold text-primary flex items-center gap-2">
+              <Icon name="payments" fill className="text-[20px]" />
+              Pending Disbursals
+            </h2>
+            <p className="text-xs text-on-surface-variant">
+              Requests approved by welfare officers. Only administrators can release funds to recipient accounts.
+            </p>
+          </div>
+          <span className="text-xs px-2.5 py-1 rounded-full bg-primary text-on-primary font-semibold">
+            {disbursalsQuery.data?.length ?? 0} awaiting
+          </span>
+        </div>
+        {disbursalError && (
+          <div className="px-5 py-2 text-xs text-error bg-error-container/40 border-b border-error/30">
+            {disbursalError}
+          </div>
+        )}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-surface-container-low text-xs uppercase text-on-surface-variant">
+              <tr>
+                <th className="px-5 py-3 text-left">Recipient</th>
+                <th className="px-5 py-3 text-left">Request</th>
+                <th className="px-5 py-3 text-left">Amount (UGX)</th>
+                <th className="px-5 py-3 text-left">Deposit account</th>
+                <th className="px-5 py-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-outline-variant">
+              {disbursalsQuery.isLoading && (
+                <tr><td colSpan={5} className="px-5 py-6 text-center text-on-surface-variant">Loading…</td></tr>
+              )}
+              {disbursalsQuery.data?.length === 0 && (
+                <tr><td colSpan={5} className="px-5 py-6 text-center text-on-surface-variant">
+                  Nothing to disburse. Approved requests will appear here.
+                </td></tr>
+              )}
+              {disbursalsQuery.data?.map((row) => {
+                const p = row.profiles;
+                const hasAcc = !!(p?.payout_account_number && p?.payout_provider);
+                return (
+                  <tr key={row.id} className="hover:bg-surface-container/40">
+                    <td className="px-5 py-3">
+                      <div className="font-medium">{p?.full_name ?? "Unknown"}</div>
+                      <div className="text-xs text-on-surface-variant font-mono">{p?.service_number ?? "—"}</div>
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="font-medium">{row.title}</div>
+                      <div className="text-xs text-on-surface-variant capitalize">{row.request_type}</div>
+                    </td>
+                    <td className="px-5 py-3 font-mono">
+                      {row.amount_approved ? row.amount_approved.toLocaleString() : <span className="text-on-surface-variant">— ask</span>}
+                    </td>
+                    <td className="px-5 py-3">
+                      {hasAcc ? (
+                        <div className="text-xs">
+                          <div className="font-medium capitalize">{p?.payout_method === "mobile_money" ? "Mobile Money" : "Bank"} · {p?.payout_provider}</div>
+                          <div className="font-mono text-on-surface-variant">{p?.payout_account_number}</div>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-error">No account on file</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <button
+                        disabled={!hasAcc || disbursingId === row.id}
+                        onClick={() => disburse(row)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded bg-primary text-on-primary hover:bg-primary-container disabled:opacity-40"
+                      >
+                        <Icon name="send_money" className="text-[14px]" />
+                        {disbursingId === row.id ? "Disbursing…" : "Disburse"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <div className="grid grid-cols-12 gap-6">
         <section className="col-span-12 lg:col-span-8 bg-card border border-outline-variant rounded-lg overflow-hidden">
