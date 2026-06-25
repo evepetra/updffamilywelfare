@@ -130,15 +130,17 @@ function AdminConsole() {
     setDisbursingId(row.id);
     const { error: insErr } = await supabase.from("aid_ledger").insert({
       recipient_user_id: row.user_id,
+      recipient_name: p.full_name ?? "Unknown",
+      region: "—",
       request_id: row.id,
       aid_type: row.request_type,
       amount: row.amount_approved ?? 0,
       status: "disbursed",
+      disbursed_at: new Date().toISOString(),
       payout_method: p.payout_method,
       payout_provider: p.payout_provider,
       payout_account_name: p.payout_account_name,
       payout_account_number: p.payout_account_number,
-      notes: `Disbursed for request: ${row.title}`,
     });
     if (insErr) {
       setDisbursingId(null);
