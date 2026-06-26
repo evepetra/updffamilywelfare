@@ -267,19 +267,19 @@ function LoginPage() {
               fill
               className="text-on-primary-container text-5xl mb-1"
             />
-            <span className="text-on-primary-container text-xs uppercase tracking-[0.2em] font-medium">
-              Institutional Access
+            <span className="text-on-primary-container text-xs uppercase tracking-[0.2em] font-medium text-center w-full">
+              UPDF FAMILY WELFARE
             </span>
           </div>
 
           <div className="p-8 md:p-10">
             <div className="mb-7">
-              <h2 className="text-2xl font-bold text-primary mb-1.5">
+              <h2 className="text-2xl font-bold text-primary mb-1.5 text-center">
                 {mode === "signup"
                   ? signupRole === "soldier"
                     ? "New Soldier Create account"
                     : "Create Portal Account"
-                  : "Secure Portal Login"}
+                  : "PORTAL LOGIN"}
               </h2>
               <p className="text-sm text-on-surface-variant">
                 {mode === "signup"
