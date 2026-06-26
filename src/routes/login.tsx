@@ -30,7 +30,7 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
-type Role = "family" | "officer" | "admin";
+type Role = "family" | "soldier" | "officer" | "admin" | "system_admin";
 
 // Army Number: RA/ or RAV/ require exactly 6 digits, RO/ or ROV/ require exactly 5 digits.
 const ARMY_NUMBER_REGEX = /^(?:(?:RA|RAV)\/\d{6}|(?:RO|ROV)\/\d{5})$/i;
@@ -110,7 +110,9 @@ function LoginPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   // Role only matters during signup (admins cannot self-register).
   // For sign-in the destination is derived from the user's actual public.user_roles.
-  const [signupRole, setSignupRole] = useState<Exclude<Role, "admin">>("family");
+  const [signupRole, setSignupRole] = useState<Extract<Role, "family" | "soldier">>(
+    "family",
+  );
   const [showPass, setShowPass] = useState(false);
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
@@ -145,9 +147,9 @@ function LoginPage() {
     try {
       if (mode === "signup") {
         const role = signupRole;
-        const schema = role === "officer" ? soldierSignUpSchema : familySignUpSchema;
+        const schema = role === "soldier" ? soldierSignUpSchema : familySignUpSchema;
         const parsed = schema.safeParse(
-          role === "officer"
+          role === "soldier"
             ? { email, password, fullName, nin, armyNumber, rank }
             : { email, password, fullName, nin },
         );
@@ -166,7 +168,7 @@ function LoginPage() {
           setFieldErrors({ nin: ninCheck.reason ?? "Invalid NIN" });
           throw new Error(ninCheck.reason ?? "Invalid NIN");
         }
-        const army = role === "officer" ? armyNumber.trim().toUpperCase() : "";
+        const army = role === "soldier" ? armyNumber.trim().toUpperCase() : "";
         const { error } = await supabase.auth.signUp({
           email: parsed.data.email,
           password: parsed.data.password,
@@ -176,7 +178,7 @@ function LoginPage() {
               full_name: parsed.data.fullName,
               nin: ninCheck.nin,
               signup_role: role,
-              ...(role === "officer"
+              ...(role === "soldier"
                 ? { army_number: army, service_number: army, rank }
                 : {}),
             },
@@ -221,14 +223,16 @@ function LoginPage() {
             .select("role")
             .eq("user_id", uid);
           const roles = ((rs ?? []) as { role: Role }[]).map((r) => r.role);
-          if (roles.includes("admin")) resolved = "admin";
+          if (roles.includes("system_admin")) resolved = "system_admin";
+          else if (roles.includes("admin")) resolved = "admin";
           else if (roles.includes("officer")) resolved = "officer";
+          else if (roles.includes("soldier")) resolved = "soldier";
         }
         await callAuthorize({
           data: { requestedRole: resolved, email: parsed.data.email },
         }).catch(() => ({ authorized: true }));
         const dest =
-          resolved === "admin"
+          resolved === "system_admin" || resolved === "admin"
             ? "/admin-console"
             : resolved === "officer"
               ? "/admin"
@@ -272,14 +276,14 @@ function LoginPage() {
             <div className="mb-7">
               <h2 className="text-2xl font-bold text-primary mb-1.5">
                 {mode === "signup"
-                  ? signupRole === "officer"
+                  ? signupRole === "soldier"
                     ? "New Soldier Create account"
                     : "Create Portal Account"
                   : "Secure Portal Login"}
               </h2>
               <p className="text-sm text-on-surface-variant">
                 {mode === "signup"
-                  ? "Register a family account. Officer/admin access is granted by your welfare directorate."
+                  ? "Register a family or soldier account. Welfare-officer, admin and system-admin access are provisioned by the welfare directorate."
                   : "Authenticate with your institutional credentials."}
               </p>
             </div>
@@ -430,7 +434,7 @@ function LoginPage() {
                       </p>
                     )}
                   </div>
-                  {signupRole === "officer" && (
+                  {signupRole === "soldier" && (
                     <div>
                       <label className="block text-sm font-medium text-on-surface mb-1.5">
                         Rank
@@ -457,7 +461,7 @@ function LoginPage() {
                       )}
                     </div>
                   )}
-                  {signupRole === "officer" && (
+                  {signupRole === "soldier" && (
                     <div>
                       <label className="block text-sm font-medium text-on-surface mb-1.5">
                         Army Number
@@ -588,9 +592,13 @@ function LoginPage() {
   );
 }
 
-const SIGNUP_ROLES: { value: Exclude<Role, "admin">; label: string; icon: string }[] = [
-  { value: "family", label: "Family", icon: "family_restroom" },
-  { value: "officer", label: "Militant (Soldier)", icon: "military_tech" },
+const SIGNUP_ROLES: {
+  value: Extract<Role, "family" | "soldier">;
+  label: string;
+  icon: string;
+}[] = [
+  { value: "family", label: "Family Member", icon: "family_restroom" },
+  { value: "soldier", label: "Soldier", icon: "military_tech" },
 ];
 
 function passwordStrength(p: string): "weak" | "medium" | "strong" {
