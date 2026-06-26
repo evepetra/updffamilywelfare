@@ -570,6 +570,7 @@ function RecordDisbursalDialog({
   onSaved: () => void;
 }) {
   const [recipientName, setRecipientName] = useState("");
+  const [recipientUserId, setRecipientUserId] = useState("");
   const [region, setRegion] = useState("Central");
   const [aidType, setAidType] = useState("Medical");
   const [amount, setAmount] = useState("");
@@ -582,6 +583,7 @@ function RecordDisbursalDialog({
     setErr(null);
     const { error } = await supabase.from("aid_ledger").insert({
       recipient_name: recipientName.trim(),
+      recipient_user_id: recipientUserId.trim(),
       region,
       aid_type: aidType,
       amount: Number(amount) || 0,
@@ -616,6 +618,12 @@ function RecordDisbursalDialog({
             placeholder="Recipient name"
             className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
           />
+          <input
+            value={recipientUserId}
+            onChange={(e) => setRecipientUserId(e.target.value)}
+            placeholder="Recipient user ID (UUID)"
+            className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+          />
           <div className="grid grid-cols-2 gap-3">
             <select value={region} onChange={(e) => setRegion(e.target.value)} className="px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm">
               {["Central", "Western", "Northern", "Eastern", "West Nile"].map((r) => (
@@ -647,7 +655,7 @@ function RecordDisbursalDialog({
             Cancel
           </button>
           <button
-            disabled={busy || !recipientName || !amount}
+            disabled={busy || !recipientName || !recipientUserId || !amount}
             onClick={save}
             className="px-5 py-2.5 text-sm font-semibold bg-primary text-on-primary rounded-md hover:bg-primary-container disabled:opacity-50"
           >
