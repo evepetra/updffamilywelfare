@@ -17,7 +17,6 @@ const NAV: (NavItem & { roles: NavRole[] })[] = [
   { to: "/ledger",         label: "Aid Ledger",              icon: "inventory_2",          roles: ["officer", "admin", "system_admin"] },
   { to: "/support",        label: "Support Request",         icon: "support_agent",        roles: ["family", "soldier", "admin", "system_admin"] },
   { to: "/reports",        label: "Reporting Tools",         icon: "analytics",            roles: ["admin", "system_admin"] },
-  { to: "/manual",         label: "User Manual",             icon: "menu_book",            roles: ["family", "soldier", "officer", "admin", "system_admin"] },
 ];
 
 interface AppShellProps {
@@ -233,12 +232,10 @@ function MobileNav({ pathname }: { pathname: string }) {
       ? [
           { to: "/admin", label: "Console", icon: "shield_person" },
           { to: "/ledger", label: "Ledger", icon: "inventory_2" },
-          { to: "/manual", label: "Manual", icon: "menu_book" },
         ]
       : [
           { to: "/dashboard", label: "Home", icon: "dashboard" },
           { to: "/support", label: "Request", icon: "support_agent" },
-          { to: "/manual", label: "Manual", icon: "menu_book" },
         ];
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 bg-surface-container-lowest border-t border-outline-variant h-16 flex justify-around items-center z-40">

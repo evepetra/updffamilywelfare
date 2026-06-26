@@ -179,7 +179,6 @@ function TrustPage() {
         <div className="max-w-4xl mx-auto flex flex-col md:flex-row justify-between gap-3 text-xs text-on-surface-variant">
           <p>© 2026 UPDF Welfare. Secure Institutional Portal.</p>
           <div className="flex gap-5">
-            <Link className="hover:text-secondary" to="/manual">User Manual</Link>
             <Link className="hover:text-secondary" to="/login">Sign in</Link>
           </div>
         </div>
