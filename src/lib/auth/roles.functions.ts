@@ -20,9 +20,13 @@ export const getMyRoles = createServerFn({ method: "GET" })
     return {
       userId: context.userId,
       roles,
-      isAdmin: roles.includes("admin"),
+      isAdmin: roles.includes("admin") || roles.includes("system_admin"),
+      isSystemAdmin: roles.includes("system_admin"),
       isOfficer: roles.includes("officer"),
-      isStaff: roles.includes("admin") || roles.includes("officer"),
+      isStaff:
+        roles.includes("admin") ||
+        roles.includes("system_admin") ||
+        roles.includes("officer"),
     };
   });
 
@@ -35,11 +39,14 @@ export const requireStaff = createServerFn({ method: "GET" })
       .eq("user_id", context.userId);
     if (error) throw new Error(error.message);
     const roles = ((data ?? []) as { role: AppRole }[]).map((r) => r.role);
-    const isStaff = roles.includes("admin") || roles.includes("officer");
+    const isStaff =
+      roles.includes("admin") ||
+      roles.includes("system_admin") ||
+      roles.includes("officer");
     return {
       userId: context.userId,
       roles,
-      isAdmin: roles.includes("admin"),
+      isAdmin: roles.includes("admin") || roles.includes("system_admin"),
       isStaff,
       authorized: isStaff,
     };
