@@ -9,14 +9,15 @@ interface NavItem {
   icon: string;
 }
 
-const NAV: (NavItem & { roles: ("family" | "officer" | "admin")[] })[] = [
-  { to: "/dashboard",      label: "Family Dashboard",  icon: "dashboard",                roles: ["family", "admin"] },
-  { to: "/admin-console",  label: "Admin Console",     icon: "admin_panel_settings",     roles: ["admin"] },
-  { to: "/admin",          label: "Welfare Officer Console", icon: "shield_person",      roles: ["officer", "admin"] },
-  { to: "/ledger",         label: "Aid Ledger",        icon: "inventory_2",              roles: ["officer", "admin"] },
-  { to: "/support",        label: "Support Request",   icon: "support_agent",            roles: ["family", "admin"] },
-  { to: "/reports",        label: "Reporting Tools",   icon: "analytics",                roles: ["admin"] },
-  { to: "/manual",         label: "User Manual",       icon: "menu_book",                roles: ["family", "officer", "admin"] },
+type NavRole = "family" | "soldier" | "officer" | "admin" | "system_admin";
+const NAV: (NavItem & { roles: NavRole[] })[] = [
+  { to: "/dashboard",      label: "My Dashboard",            icon: "dashboard",            roles: ["family", "soldier", "admin", "system_admin"] },
+  { to: "/admin-console",  label: "Admin Console",           icon: "admin_panel_settings", roles: ["admin", "system_admin"] },
+  { to: "/admin",          label: "Welfare Officer Console", icon: "shield_person",        roles: ["officer", "admin", "system_admin"] },
+  { to: "/ledger",         label: "Aid Ledger",              icon: "inventory_2",          roles: ["officer", "admin", "system_admin"] },
+  { to: "/support",        label: "Support Request",         icon: "support_agent",        roles: ["family", "soldier", "admin", "system_admin"] },
+  { to: "/reports",        label: "Reporting Tools",         icon: "analytics",            roles: ["admin", "system_admin"] },
+  { to: "/manual",         label: "User Manual",             icon: "menu_book",            roles: ["family", "soldier", "officer", "admin", "system_admin"] },
 ];
 
 interface AppShellProps {
@@ -43,7 +44,17 @@ export function AppShell({ title, subtitle, actions, children }: AppShellProps) 
       <TopBar
         name={auth.profile?.full_name || auth.user?.email || "User"}
         serviceNumber={auth.profile?.service_number || ""}
-        roleLabel={auth.isAdmin ? "Administrator" : auth.isOfficer ? "Welfare Officer" : "Family Member"}
+        roleLabel={
+          auth.isSystemAdmin
+            ? "System Administrator"
+            : auth.isAdmin
+              ? "Administrator"
+              : auth.isOfficer
+                ? "Welfare Officer"
+                : auth.isSoldier
+                  ? "Soldier"
+                  : "Family Member"
+        }
         onSignOut={auth.signOut}
       />
       <div className="flex-1 flex w-full">
@@ -53,7 +64,15 @@ export function AppShell({ title, subtitle, actions, children }: AppShellProps) 
           </p>
           {NAV.filter((n) =>
             n.roles.some((r) =>
-              r === "admin" ? auth.isAdmin : r === "officer" ? auth.isOfficer : auth.isFamily,
+              r === "system_admin"
+                ? auth.isSystemAdmin
+                : r === "admin"
+                  ? auth.isAdmin
+                  : r === "officer"
+                    ? auth.isOfficer
+                    : r === "soldier"
+                      ? auth.isSoldier
+                      : auth.isFamily,
             ),
           ).map((n) => {
             const active = pathname === n.to || pathname.startsWith(n.to + "/");
@@ -74,7 +93,7 @@ export function AppShell({ title, subtitle, actions, children }: AppShellProps) 
             );
           })}
           <div className="mt-auto border-t border-outline-variant pt-4">
-            {(auth.isFamily || auth.isAdmin) && (
+            {(auth.isFamily || auth.isSoldier || auth.isAdmin || auth.isSystemAdmin) && (
               <Link
                 to="/support"
                 className="flex items-center justify-center gap-2 bg-primary text-on-primary px-4 py-3 rounded-md text-sm font-semibold hover:bg-primary-container transition-colors"
@@ -98,31 +117,30 @@ export function AppShell({ title, subtitle, actions, children }: AppShellProps) 
             <div>
             {auth.roles.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2">
-                {auth.roles.map((r) => (
-                  <span
-                    key={r}
-                    className={
-                      "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wider " +
-                      (r === "admin"
-                        ? "bg-primary text-on-primary"
+                {auth.roles.map((r) => {
+                  const meta =
+                    r === "system_admin"
+                      ? { label: "System Administrator", icon: "verified_user", cls: "bg-primary text-on-primary" }
+                      : r === "admin"
+                        ? { label: "Administrator", icon: "admin_panel_settings", cls: "bg-primary text-on-primary" }
                         : r === "officer"
-                          ? "bg-secondary text-on-secondary"
-                          : "bg-tertiary text-on-tertiary")
-                    }
-                  >
-                    <Icon
-                      name={
-                        r === "admin"
-                          ? "admin_panel_settings"
-                          : r === "officer"
-                            ? "military_tech"
-                            : "family_restroom"
+                          ? { label: "Welfare Officer", icon: "shield_person", cls: "bg-secondary text-on-secondary" }
+                          : r === "soldier"
+                            ? { label: "Soldier", icon: "military_tech", cls: "bg-tertiary text-on-tertiary" }
+                            : { label: "Family", icon: "family_restroom", cls: "bg-tertiary text-on-tertiary" };
+                  return (
+                    <span
+                      key={r}
+                      className={
+                        "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wider " +
+                        meta.cls
                       }
-                      className="text-[13px]"
-                    />
-                    {r === "officer" ? "Welfare Officer" : r.charAt(0).toUpperCase() + r.slice(1)}
-                  </span>
-                ))}
+                    >
+                      <Icon name={meta.icon} className="text-[13px]" />
+                      {meta.label}
+                    </span>
+                  );
+                })}
               </div>
             )}
               <h1 className="text-3xl md:text-4xl font-bold text-primary tracking-tight">
@@ -204,12 +222,12 @@ function TopBar({
 
 function MobileNav({ pathname }: { pathname: string }) {
   const auth = useAuth();
-  const items: NavItem[] = auth.isAdmin
+  const items: NavItem[] = auth.isAdmin || auth.isSystemAdmin
     ? [
         { to: "/admin-console", label: "Admin", icon: "admin_panel_settings" },
         { to: "/admin", label: "Officer", icon: "shield_person" },
         { to: "/ledger", label: "Ledger", icon: "inventory_2" },
-        { to: "/dashboard", label: "Family", icon: "dashboard" },
+        { to: "/dashboard", label: "Home", icon: "dashboard" },
       ]
     : auth.isOfficer
       ? [
