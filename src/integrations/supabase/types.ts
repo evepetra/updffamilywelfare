@@ -338,7 +338,7 @@ export type Database = {
       is_valid_nin: { Args: { _nin: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "family" | "officer" | "admin"
+      app_role: "family" | "officer" | "admin" | "soldier" | "system_admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -466,7 +466,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["family", "officer", "admin"],
+      app_role: ["family", "officer", "admin", "soldier", "system_admin"],
     },
   },
 } as const
