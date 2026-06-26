@@ -13,7 +13,6 @@ import { Route as TrustRouteImport } from './routes/trust'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ReportsRouteImport } from './routes/reports'
-import { Route as ManualRouteImport } from './routes/manual'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LedgerRouteImport } from './routes/ledger'
 import { Route as DashboardRouteImport } from './routes/dashboard'
@@ -41,11 +40,6 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
 const ReportsRoute = ReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ManualRoute = ManualRouteImport.update({
-  id: '/manual',
-  path: '/manual',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -96,7 +90,6 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/ledger': typeof LedgerRoute
   '/login': typeof LoginRoute
-  '/manual': typeof ManualRoute
   '/reports': typeof ReportsRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/support': typeof SupportRouteWithChildren
@@ -111,7 +104,6 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/ledger': typeof LedgerRoute
   '/login': typeof LoginRoute
-  '/manual': typeof ManualRoute
   '/reports': typeof ReportsRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/support': typeof SupportRouteWithChildren
@@ -127,7 +119,6 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/ledger': typeof LedgerRoute
   '/login': typeof LoginRoute
-  '/manual': typeof ManualRoute
   '/reports': typeof ReportsRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/support': typeof SupportRouteWithChildren
@@ -144,7 +135,6 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/ledger'
     | '/login'
-    | '/manual'
     | '/reports'
     | '/sitemap.xml'
     | '/support'
@@ -159,7 +149,6 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/ledger'
     | '/login'
-    | '/manual'
     | '/reports'
     | '/sitemap.xml'
     | '/support'
@@ -174,7 +163,6 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/ledger'
     | '/login'
-    | '/manual'
     | '/reports'
     | '/sitemap.xml'
     | '/support'
@@ -190,7 +178,6 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   LedgerRoute: typeof LedgerRoute
   LoginRoute: typeof LoginRoute
-  ManualRoute: typeof ManualRoute
   ReportsRoute: typeof ReportsRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SupportRoute: typeof SupportRouteWithChildren
@@ -226,13 +213,6 @@ declare module '@tanstack/react-router' {
       path: '/reports'
       fullPath: '/reports'
       preLoaderRoute: typeof ReportsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/manual': {
-      id: '/manual'
-      path: '/manual'
-      fullPath: '/manual'
-      preLoaderRoute: typeof ManualRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -312,7 +292,6 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   LedgerRoute: LedgerRoute,
   LoginRoute: LoginRoute,
-  ManualRoute: ManualRoute,
   ReportsRoute: ReportsRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SupportRoute: SupportRouteWithChildren,
@@ -322,13 +301,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

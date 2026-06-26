@@ -169,7 +169,7 @@ function FamilyDashboard() {
           </h2>
           <QuickAction icon="add_box" title="Start New Request" desc="Educational or medical aid" to="/support" />
           <QuickAction icon="fact_check" title="Check Eligibility" desc="Update your family profile" color="secondary" to="/support" />
-          <QuickAction icon="help" title="Welfare Guidance" desc="Contact assigned officer" color="tertiary" to="/manual" />
+          <QuickAction icon="help" title="Welfare Guidance" desc="Contact assigned officer" color="tertiary" to="/support" />
         </section>
 
         <section className="col-span-12 lg:col-span-6 bg-card rounded-lg border border-outline-variant overflow-hidden">

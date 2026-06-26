@@ -43,10 +43,10 @@ function ChildCarePage() {
       <header className="bg-primary text-on-primary px-6 md:px-10 py-10 border-b border-primary-container">
         <div className="max-w-3xl mx-auto">
           <Link
-            to="/manual"
+            to="/support"
             className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.18em] text-on-primary/80 hover:text-on-primary mb-4"
           >
-            <Icon name="arrow_back" className="text-[16px]" /> Back to manual
+            <Icon name="arrow_back" className="text-[16px]" /> Back to support
           </Link>
           <h1 className="text-3xl md:text-4xl font-bold leading-tight">
             Military Child Care Assistance &amp; Subsidies
@@ -149,9 +149,7 @@ function ChildCarePage() {
 
         <section className="rounded-md border border-outline-variant bg-surface-container-low p-5">
           <p className="text-sm text-on-surface-variant">
-            Need help with your application? Visit the{" "}
-            <Link to="/manual" className="text-secondary hover:underline">user manual</Link>{" "}
-            or contact your welfare officer through the{" "}
+            Need help with your application? Contact your welfare officer through the{" "}
             <Link to="/support" className="text-secondary hover:underline">support request form</Link>.
           </p>
         </section>
