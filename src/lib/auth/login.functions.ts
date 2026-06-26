@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-type RequestedRole = "family" | "officer" | "admin";
+type RequestedRole = "family" | "soldier" | "officer" | "admin" | "system_admin";
 
 const NIN_RE = /^C[MF][A-Z0-9]{12}$/;
 
@@ -55,16 +55,26 @@ export const authorizeLogin = createServerFn({ method: "POST" })
     let authorized = true;
     let reason: string | null = null;
 
-    if (requested === "admin" && !roles.includes("admin")) {
+    if (
+      requested === "system_admin" &&
+      !roles.includes("system_admin")
+    ) {
+      authorized = false;
+      reason =
+        "System Administrator access denied: account is not provisioned as system_admin.";
+    } else if (
+      requested === "admin" &&
+      !(roles.includes("admin") || roles.includes("system_admin"))
+    ) {
       authorized = false;
       reason =
         "Admin access denied: account is not provisioned as admin. Admin accounts must be pre-created by the welfare directorate.";
     } else if (
       requested === "officer" &&
-      !(roles.includes("officer") || roles.includes("admin"))
+      !(roles.includes("officer") || roles.includes("admin") || roles.includes("system_admin"))
     ) {
       authorized = false;
-      reason = "Militant (Soldier) access denied: account lacks officer role.";
+      reason = "Welfare Officer access denied: account lacks officer role.";
     }
 
     // Audit writes go through the service role only — direct INSERT by
