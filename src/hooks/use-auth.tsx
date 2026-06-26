@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
 
-type Role = "family" | "officer" | "admin";
+type Role = "family" | "soldier" | "officer" | "admin" | "system_admin";
 
 export interface AuthState {
   loading: boolean;
@@ -12,8 +12,12 @@ export interface AuthState {
   profile: { full_name: string | null; service_number: string | null } | null;
   roles: Role[];
   isFamily: boolean;
+  isSoldier: boolean;
   isOfficer: boolean;
   isAdmin: boolean;
+  isSystemAdmin: boolean;
+  isStaff: boolean;
+  isBeneficiary: boolean;
   signOut: () => Promise<void>;
 }
 
@@ -76,8 +80,15 @@ export function useAuth(redirectIfUnauthed = true): AuthState {
     profile,
     roles,
     isFamily: roles.includes("family"),
+    isSoldier: roles.includes("soldier"),
     isOfficer: roles.includes("officer"),
     isAdmin: roles.includes("admin"),
+    isSystemAdmin: roles.includes("system_admin"),
+    isStaff:
+      roles.includes("officer") ||
+      roles.includes("admin") ||
+      roles.includes("system_admin"),
+    isBeneficiary: roles.includes("family") || roles.includes("soldier"),
     signOut: async () => {
       await supabase.auth.signOut();
       navigate({ to: "/login" });
