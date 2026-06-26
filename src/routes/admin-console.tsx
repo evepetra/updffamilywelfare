@@ -6,7 +6,14 @@ import { Icon } from "@/components/Icon";
 import { supabase } from "@/integrations/supabase/client";
 import { adminListUsers, requireAdmin } from "@/lib/auth/roles.functions";
 
-type AppRole = "family" | "officer" | "admin";
+type AppRole = "family" | "soldier" | "officer" | "admin" | "system_admin";
+const ROLE_LABEL: Record<AppRole, string> = {
+  family: "Family",
+  soldier: "Soldier",
+  officer: "Officer",
+  admin: "Admin",
+  system_admin: "Sys Admin",
+};
 type AdminUserRow = {
   id: string;
   email: string | null;
@@ -241,8 +248,10 @@ function AdminConsole() {
     URL.revokeObjectURL(url);
   }
 
+  const sysAdmins = users.filter((u) => u.roles?.includes("system_admin")).length;
   const admins = users.filter((u) => u.roles?.includes("admin")).length;
   const officers = users.filter((u) => u.roles?.includes("officer")).length;
+  const soldiers = users.filter((u) => u.roles?.includes("soldier")).length;
   const families = users.filter((u) => u.roles?.includes("family")).length;
 
   async function toggleRole(userId: string, role: AppRole, has: boolean) {
@@ -328,9 +337,11 @@ function AdminConsole() {
         </Link>
       }
     >
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+        <KpiCard label="System Admins" value={String(sysAdmins)} icon="verified_user" tone="bg-primary text-on-primary" />
         <KpiCard label="Administrators" value={String(admins)} icon="admin_panel_settings" tone="bg-primary text-on-primary" />
         <KpiCard label="Welfare Officers" value={String(officers)} icon="military_tech" tone="bg-secondary text-on-secondary" />
+        <KpiCard label="Soldiers" value={String(soldiers)} icon="military_tech" tone="bg-tertiary text-on-tertiary" />
         <KpiCard label="Family Accounts" value={String(families)} icon="family_restroom" tone="bg-tertiary text-on-tertiary" />
       </div>
 
@@ -441,19 +452,19 @@ function AdminConsole() {
               <span className="font-semibold text-primary mr-2">
                 {selected.size} selected
               </span>
-              {(["admin", "officer", "family"] as AppRole[]).flatMap((r) => [
+              {(["system_admin", "admin", "officer", "soldier", "family"] as AppRole[]).flatMap((r) => [
                 <button
                   key={`g-${r}`}
                   disabled={bulkBusy}
                   onClick={() => bulkApply(r, "grant")}
                   className="px-2.5 py-1 rounded border border-primary text-primary hover:bg-primary hover:text-on-primary disabled:opacity-50"
-                >Grant {r}</button>,
+                >Grant {ROLE_LABEL[r]}</button>,
                 <button
                   key={`r-${r}`}
                   disabled={bulkBusy}
                   onClick={() => bulkApply(r, "revoke")}
                   className="px-2.5 py-1 rounded border border-error text-error hover:bg-error hover:text-on-error disabled:opacity-50"
-                >Revoke {r}</button>,
+                >Revoke {ROLE_LABEL[r]}</button>,
               ])}
               <button
                 onClick={() => setSelected(new Set())}
@@ -488,22 +499,24 @@ function AdminConsole() {
                   </th>
                   <th className="text-left px-5 py-3 font-medium">User</th>
                   <th className="text-left px-5 py-3 font-medium">Email</th>
+                  <th className="text-center px-3 py-3 font-medium">Sys Admin</th>
                   <th className="text-center px-3 py-3 font-medium">Admin</th>
+                  <th className="text-center px-3 py-3 font-medium">Officer</th>
                   <th className="text-center px-3 py-3 font-medium">Soldier</th>
                   <th className="text-center px-3 py-3 font-medium">Family</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant">
                 {usersQuery.isLoading && (
-                  <tr><td colSpan={6} className="text-center py-8 text-on-surface-variant">Loading users…</td></tr>
+                  <tr><td colSpan={8} className="text-center py-8 text-on-surface-variant">Loading users…</td></tr>
                 )}
                 {usersQuery.error && !usersQuery.isLoading && (
-                  <tr><td colSpan={6} className="text-center py-8 text-error">
+                  <tr><td colSpan={8} className="text-center py-8 text-error">
                     {(usersQuery.error as Error).message}
                   </td></tr>
                 )}
                 {!usersQuery.isLoading && filtered.length === 0 && (
-                  <tr><td colSpan={6} className="text-center py-8 text-on-surface-variant">No users match.</td></tr>
+                  <tr><td colSpan={8} className="text-center py-8 text-on-surface-variant">No users match.</td></tr>
                 )}
                 {filtered.map((u) => {
                   const userRoles = u.roles ?? [];
@@ -524,7 +537,7 @@ function AdminConsole() {
                         </p>
                       </td>
                       <td className="px-5 py-3 text-on-surface-variant">{u.email}</td>
-                      {(["admin", "officer", "family"] as AppRole[]).map((role) => {
+                      {(["system_admin", "admin", "officer", "soldier", "family"] as AppRole[]).map((role) => {
                         const has = userRoles.includes(role);
                         const key = `${u.id}:${role}`;
                         return (
@@ -580,8 +593,10 @@ function AdminConsole() {
               className="px-3 py-2 text-xs bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary"
             >
               <option value="all">All roles</option>
+              <option value="system_admin">System Admin</option>
               <option value="admin">Admin</option>
-              <option value="officer">Soldier (officer)</option>
+              <option value="officer">Welfare Officer</option>
+              <option value="soldier">Soldier</option>
               <option value="family">Family</option>
             </select>
           </div>

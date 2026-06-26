@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-export type AppRole = "family" | "officer" | "admin";
+export type AppRole = "family" | "soldier" | "officer" | "admin" | "system_admin";
 
 /**
  * Server-validated role lookup for the current authenticated user.
@@ -20,9 +20,13 @@ export const getMyRoles = createServerFn({ method: "GET" })
     return {
       userId: context.userId,
       roles,
-      isAdmin: roles.includes("admin"),
+      isAdmin: roles.includes("admin") || roles.includes("system_admin"),
+      isSystemAdmin: roles.includes("system_admin"),
       isOfficer: roles.includes("officer"),
-      isStaff: roles.includes("admin") || roles.includes("officer"),
+      isStaff:
+        roles.includes("admin") ||
+        roles.includes("system_admin") ||
+        roles.includes("officer"),
     };
   });
 
@@ -35,11 +39,14 @@ export const requireStaff = createServerFn({ method: "GET" })
       .eq("user_id", context.userId);
     if (error) throw new Error(error.message);
     const roles = ((data ?? []) as { role: AppRole }[]).map((r) => r.role);
-    const isStaff = roles.includes("admin") || roles.includes("officer");
+    const isStaff =
+      roles.includes("admin") ||
+      roles.includes("system_admin") ||
+      roles.includes("officer");
     return {
       userId: context.userId,
       roles,
-      isAdmin: roles.includes("admin"),
+      isAdmin: roles.includes("admin") || roles.includes("system_admin"),
       isStaff,
       authorized: isStaff,
     };
@@ -52,7 +59,19 @@ export const requireAdmin = createServerFn({ method: "GET" })
       .from("user_roles")
       .select("role")
       .eq("user_id", context.userId)
-      .eq("role", "admin")
+      .in("role", ["admin", "system_admin"]);
+    if (error) throw new Error(error.message);
+    return { userId: context.userId, authorized: (data ?? []).length > 0 };
+  });
+
+export const requireSystemAdmin = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .eq("role", "system_admin")
       .maybeSingle();
     if (error) throw new Error(error.message);
     return { userId: context.userId, authorized: Boolean(data) };
@@ -80,10 +99,9 @@ export const adminListUsers = createServerFn({ method: "GET" })
       .from("user_roles")
       .select("role")
       .eq("user_id", context.userId)
-      .eq("role", "admin")
-      .maybeSingle();
+      .in("role", ["admin", "system_admin"]);
     if (adminErr) throw new Error(adminErr.message);
-    if (!adminCheck) throw new Error("Forbidden: admin access required");
+    if (!(adminCheck ?? []).length) throw new Error("Forbidden: admin access required");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
