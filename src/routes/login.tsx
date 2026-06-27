@@ -135,6 +135,7 @@ function LoginPage() {
   const [nin, setNin] = useState("");
   const [armyNumber, setArmyNumber] = useState("");
   const [rank, setRank] = useState<string>("");
+  const [region, setRegion] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signupNotice, setSignupNotice] = useState<string | null>(null);
@@ -158,6 +159,7 @@ function LoginPage() {
     nin?: string;
     armyNumber?: string;
     rank?: string;
+    region?: string;
   }>({});
 
   useEffect(() => {
@@ -180,8 +182,8 @@ function LoginPage() {
         const schema = role === "soldier" ? soldierSignUpSchema : familySignUpSchema;
         const parsed = schema.safeParse(
           role === "soldier"
-            ? { email, password, fullName, nin, armyNumber, rank }
-            : { email, password, fullName, nin },
+            ? { email, password, fullName, nin, region, armyNumber, rank }
+            : { email, password, fullName, nin, region },
         );
         if (!parsed.success) {
           const fe: typeof fieldErrors = {};
@@ -207,6 +209,7 @@ function LoginPage() {
             data: {
               full_name: parsed.data.fullName,
               nin: ninCheck.nin,
+              region: parsed.data.region,
               signup_role: role,
               ...(role === "soldier"
                 ? { army_number: army, service_number: army, rank }
