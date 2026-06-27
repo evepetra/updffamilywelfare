@@ -123,6 +123,9 @@ function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signupNotice, setSignupNotice] = useState<string | null>(null);
+  const [resendBusy, setResendBusy] = useState(false);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
+  const [lastSignupEmail, setLastSignupEmail] = useState<string>("");
   const [fieldErrors, setFieldErrors] = useState<{
     email?: string;
     password?: string;
@@ -197,6 +200,8 @@ function LoginPage() {
           setSignupNotice(
             `Account created. We've sent a confirmation email to ${parsed.data.email}. If you don't see it in your inbox within a few minutes, please check your Spam or Junk folder.`,
           );
+          setLastSignupEmail(parsed.data.email);
+          setResendMsg(null);
           setMode("signin");
         }
       } else {
