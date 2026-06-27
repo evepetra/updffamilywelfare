@@ -563,6 +563,43 @@ function LoginPage() {
                   {signupRole === "soldier" && (
                     <div>
                       <label className="block text-sm font-medium text-on-surface mb-1.5">
+                        UPDF Service
+                      </label>
+                      <div className="relative">
+                        <Icon
+                          name="military_tech"
+                          className="absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]"
+                        />
+                        <select
+                          required
+                          value={service}
+                          onChange={(e) => setService(e.target.value)}
+                          aria-invalid={!!fieldErrors.service}
+                          className={
+                            "w-full pl-10 pr-4 py-3 bg-surface-container-low border rounded-md focus:outline-none text-sm appearance-none " +
+                            (fieldErrors.service
+                              ? "border-error focus:border-error"
+                              : "border-outline-variant focus:border-primary")
+                          }
+                        >
+                          <option value="">Select your UPDF service…</option>
+                          {UPDF_SERVICES.map((s) => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {fieldErrors.service ? (
+                        <p className="mt-1.5 text-xs text-error">{fieldErrors.service}</p>
+                      ) : (
+                        <p className="mt-1.5 text-xs text-on-surface-variant">
+                          Choose the UPDF service you serve under: Air Force, SFC, Land Force, or Reserve Force.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {signupRole === "soldier" && (
+                    <div>
+                      <label className="block text-sm font-medium text-on-surface mb-1.5">
                         Army Number
                       </label>
                       <input
