@@ -67,6 +67,14 @@ const UPDF_REGIONS = [
   "West Nile",
 ] as const;
 
+// UPDF services a soldier may belong to (constrained on profiles.service in the DB)
+const UPDF_SERVICES = [
+  "Air Force",
+  "SFC",
+  "Land Force",
+  "Reserve Force",
+] as const;
+
 const signInSchema = z.object({
   email: z
     .string()
@@ -115,6 +123,12 @@ const soldierSignUpSchema = baseSignUpSchema.extend({
     .refine((v) => (UPDF_RANKS as readonly string[]).includes(v), {
       message: "Select a valid rank (Private to General)",
     }),
+  service: z
+    .string()
+    .trim()
+    .refine((v) => (UPDF_SERVICES as readonly string[]).includes(v), {
+      message: "Select your UPDF service",
+    }),
 });
 
 function LoginPage() {
@@ -136,6 +150,7 @@ function LoginPage() {
   const [armyNumber, setArmyNumber] = useState("");
   const [rank, setRank] = useState<string>("");
   const [region, setRegion] = useState<string>("");
+  const [service, setService] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signupNotice, setSignupNotice] = useState<string | null>(null);
@@ -160,6 +175,7 @@ function LoginPage() {
     armyNumber?: string;
     rank?: string;
     region?: string;
+    service?: string;
   }>({});
 
   useEffect(() => {
@@ -182,7 +198,7 @@ function LoginPage() {
         const schema = role === "soldier" ? soldierSignUpSchema : familySignUpSchema;
         const parsed = schema.safeParse(
           role === "soldier"
-            ? { email, password, fullName, nin, region, armyNumber, rank }
+            ? { email, password, fullName, nin, region, armyNumber, rank, service }
             : { email, password, fullName, nin, region },
         );
         if (!parsed.success) {
@@ -212,7 +228,7 @@ function LoginPage() {
               region: parsed.data.region,
               signup_role: role,
               ...(role === "soldier"
-                ? { army_number: army, service_number: army, rank }
+                ? { army_number: army, service_number: army, rank, service }
                 : {}),
             },
           },
