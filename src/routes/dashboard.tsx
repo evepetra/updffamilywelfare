@@ -672,6 +672,24 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
   );
 }
 
+function LockedField({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div
+      className="rounded-md bg-surface-container-low/60 border border-outline-variant/50 px-3 py-2 opacity-90"
+      title="Read-only — cannot be changed from your dashboard"
+      aria-readonly="true"
+    >
+      <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-outline font-medium">
+        <Icon name="lock" className="text-[12px]" />
+        <span>{label}</span>
+      </div>
+      <div className={"mt-0.5 text-on-surface-variant select-text " + (mono ? "font-mono text-sm" : "text-sm")}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
 type ProfileInfo = {
   full_name: string | null;
   service_number: string | null;
