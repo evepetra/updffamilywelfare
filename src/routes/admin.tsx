@@ -751,12 +751,26 @@ function AdminDashboard() {
                 <option value="disbursed">Disbursed</option>
               </select>
             </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="font-medium text-on-surface-variant">UPDF Service</span>
+              <select
+                value={serviceFilter}
+                onChange={(e) => setServiceFilter(e.target.value)}
+                className="px-2 py-1.5 border border-outline-variant rounded-md bg-surface-container-low text-sm"
+              >
+                <option value="all">All services</option>
+                {UPDF_SERVICES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </label>
             {(ledgerFromDate || ledgerToDate || ledgerStatusFilter !== "all") && (
               <button
                 onClick={() => {
                   setLedgerFromDate("");
                   setLedgerToDate("");
                   setLedgerStatusFilter("all");
+                  setServiceFilter("all");
                 }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-outline-variant hover:bg-surface-container"
               >
