@@ -73,12 +73,13 @@ export function filterAndSortMembers(
     );
   });
   const dir = sortDir === "asc" ? 1 : -1;
+  const cmp = (x: string, y: string) => (x < y ? -1 : x > y ? 1 : 0);
   return [...matched].sort((a, b) => {
     if (sortBy === "service")
-      return (a.service ?? "").localeCompare(b.service ?? "") * dir;
+      return cmp(a.service ?? "", b.service ?? "") * dir;
     if (sortBy === "full_name")
-      return (a.full_name ?? "").localeCompare(b.full_name ?? "") * dir;
-    return (a.created_at < b.created_at ? 1 : -1) * dir;
+      return cmp(a.full_name ?? "", b.full_name ?? "") * dir;
+    return cmp(a.created_at, b.created_at) * dir;
   });
 }
 
