@@ -765,7 +765,7 @@ function ProfileDetailsCard({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {snapshot?.service && (
+          {isSoldier && snapshot?.service && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-on-primary text-xs font-semibold">
               <Icon name="military_tech" fill className="text-[14px]" />
               {snapshot.service}
