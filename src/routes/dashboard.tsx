@@ -745,6 +745,8 @@ function ProfileDetailsCard({
       service: isSoldier ? service.trim() || null : snapshot?.service ?? null,
       rank: payload.rank,
       region: payload.region,
+      nin: snapshot?.nin ?? null,
+      created_at: snapshot?.created_at ?? null,
     });
     setEditing(false);
     onSaved();
