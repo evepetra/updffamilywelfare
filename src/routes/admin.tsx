@@ -468,6 +468,7 @@ function AdminDashboard() {
                 <tr>
                   <th className="text-left px-5 py-3 font-medium">Title</th>
                   <th className="text-left px-5 py-3 font-medium">Type</th>
+                  <th className="text-left px-5 py-3 font-medium">UPDF Service</th>
                   <th className="text-left px-5 py-3 font-medium">Urgency</th>
                   <th className="text-left px-5 py-3 font-medium">Submitted</th>
                   <th className="text-left px-5 py-3 font-medium">Docs</th>
@@ -477,10 +478,10 @@ function AdminDashboard() {
               </thead>
               <tbody className="divide-y divide-outline-variant">
                 {requestsQuery.isLoading && (
-                  <tr><td colSpan={7} className="text-center py-10 text-on-surface-variant text-sm">Loading…</td></tr>
+                  <tr><td colSpan={8} className="text-center py-10 text-on-surface-variant text-sm">Loading…</td></tr>
                 )}
                 {!requestsQuery.isLoading && filteredRequests.length === 0 && (
-                  <tr><td colSpan={7} className="text-center py-10 text-on-surface-variant text-sm">No requests match the current filter.</td></tr>
+                  <tr><td colSpan={8} className="text-center py-10 text-on-surface-variant text-sm">No requests match the current filter.</td></tr>
                 )}
                 {pagedRequests.map((r) => (
                   <tr key={r.id} className="hover:bg-surface-bright">
@@ -489,6 +490,19 @@ function AdminDashboard() {
                       <p className="text-xs text-outline">#{r.id.slice(0, 8).toUpperCase()}</p>
                     </td>
                     <td className="px-5 py-4">{r.request_type}</td>
+                    <td className="px-5 py-4 text-xs">
+                      {(() => {
+                        const svc = serviceByUserId.get(r.user_id);
+                        return svc ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-fixed-dim text-primary font-medium">
+                            <Icon name="military_tech" className="text-[12px]" />
+                            {svc}
+                          </span>
+                        ) : (
+                          <span className="text-on-surface-variant">—</span>
+                        );
+                      })()}
+                    </td>
                     <td className="px-5 py-4 capitalize">{r.urgency}</td>
                     <td className="px-5 py-4 text-on-surface-variant">
                       {new Date(r.created_at).toLocaleDateString()}
