@@ -442,6 +442,17 @@ function AdminDashboard() {
                 <Icon name="pending_actions" className="text-[14px]" />
                 Pending only
               </button>
+              <select
+                value={serviceFilter}
+                onChange={(e) => { setServiceFilter(e.target.value); setPage(1); }}
+                title="Segment by UPDF Service"
+                className="px-2 py-2 text-xs border border-outline-variant rounded-md bg-surface-container-low"
+              >
+                <option value="all">All UPDF services</option>
+                {UPDF_SERVICES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
               <button
                 onClick={() => setAuditOpen((o) => !o)}
                 className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md border border-outline-variant hover:bg-surface-container"
