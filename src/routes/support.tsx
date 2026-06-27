@@ -165,6 +165,7 @@ function SupportPage() {
   }
 
   function next() {
+    if (step === 2 && amountError) return;
     if (step < STEPS.length - 1) setStep(step + 1);
     else void submit();
   }
@@ -477,6 +478,14 @@ function SupportPage() {
                 <Summary label="Urgency" value={urgency} />
                 <Summary label="Family Head" value={profile?.full_name || "—"} />
                 <Summary label="Title" value={title || `${requestType} request`} />
+                <Summary
+                  label="Requested Amount"
+                  value={requestedAmount ? `${Number(requestedAmount).toLocaleString("en-UG")} UGX` : "—"}
+                />
+                <Summary
+                  label="Payment Method"
+                  value={paymentMethod === "mobile_money" ? "Mobile Money" : "Bank Transfer"}
+                />
               </div>
               <h3 className="text-sm font-medium mb-3">Notification Preferences</h3>
               <div className="space-y-2 mb-4">
