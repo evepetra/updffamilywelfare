@@ -7,6 +7,10 @@ import { Icon } from "@/components/Icon";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { requireStaff } from "@/lib/auth/roles.functions";
+import {
+  buildDisbursementsCsv,
+  downloadCsv,
+} from "@/lib/admin/service-filters";
 
 function DocsCell({ requestId }: { requestId: string }) {
   const { data, isLoading } = useQuery({
