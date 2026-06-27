@@ -216,14 +216,39 @@ function AdminConsole() {
   const users = usersQuery.data ?? [];
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return users;
-    return users.filter(
-      (u) =>
+    const matched = users.filter((u) => {
+      if (serviceFilter !== "all" && (u.service ?? "") !== serviceFilter) return false;
+      if (!q) return true;
+      return (
         (u.email ?? "").toLowerCase().includes(q) ||
         (u.full_name ?? "").toLowerCase().includes(q) ||
-        (u.service_number ?? "").toLowerCase().includes(q),
-    );
-  }, [users, search]);
+        (u.service_number ?? "").toLowerCase().includes(q) ||
+        (u.service ?? "").toLowerCase().includes(q)
+      );
+    });
+    const sorted = [...matched].sort((a, b) => {
+      const dir = sortDir === "asc" ? 1 : -1;
+      if (sortBy === "service") {
+        return ((a.service ?? "").localeCompare(b.service ?? "")) * dir;
+      }
+      if (sortBy === "full_name") {
+        return ((a.full_name ?? "").localeCompare(b.full_name ?? "")) * dir;
+      }
+      return (a.created_at < b.created_at ? 1 : -1) * dir;
+    });
+    return sorted;
+  }, [users, search, serviceFilter, sortBy, sortDir]);
+
+  function toggleSort(col: "created_at" | "service" | "full_name") {
+    if (sortBy === col) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(col);
+      setSortDir("asc");
+    }
+  }
+
+  const UPDF_SERVICES = ["Air Force", "SFC", "Land Force", "Reserve Force"] as const;
 
   const filteredAudit = useMemo(() => {
     const list = auditQuery.data?.rows ?? [];
