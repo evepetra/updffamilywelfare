@@ -742,7 +742,7 @@ function ProfileDetailsCard({
       full_name: payload.full_name,
       service_number: snapshot?.service_number ?? null,
       service: isSoldier ? service.trim() || null : snapshot?.service ?? null,
-      rank: payload.rank,
+      rank: (isSoldier ? payload.rank : snapshot?.rank) ?? null,
       region: payload.region,
       nin: snapshot?.nin ?? null,
       created_at: snapshot?.created_at ?? null,
