@@ -97,6 +97,51 @@ function FamilyDashboard() {
       }
     >
       <div className="grid grid-cols-12 gap-6">
+        {/* Identity card — visible to every member; shows the UPDF service a soldier is under */}
+        <section className="col-span-12 bg-card rounded-lg border border-outline-variant p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-primary flex items-center gap-2">
+                <Icon name="badge" fill className="text-[22px]" />
+                My UPDF Profile
+              </h2>
+              <p className="text-xs text-on-surface-variant mt-0.5">
+                Your service identification on file with the welfare directorate.
+              </p>
+            </div>
+            {profile?.service && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-on-primary text-xs font-semibold">
+                <Icon name="military_tech" fill className="text-[14px]" />
+                {profile.service}
+              </span>
+            )}
+          </div>
+          <dl className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <dt className="text-[10px] uppercase tracking-wider text-outline mb-1 font-medium">Full name</dt>
+              <dd className="font-medium">{profile?.full_name || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-[10px] uppercase tracking-wider text-outline mb-1 font-medium">UPDF Service</dt>
+              <dd className="font-medium">
+                {profile?.service ? profile.service : <span className="text-on-surface-variant">Not assigned</span>}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[10px] uppercase tracking-wider text-outline mb-1 font-medium">Rank</dt>
+              <dd className="font-medium">{profile?.rank || <span className="text-on-surface-variant">—</span>}</dd>
+            </div>
+            <div>
+              <dt className="text-[10px] uppercase tracking-wider text-outline mb-1 font-medium">Service / Army #</dt>
+              <dd className="font-mono font-medium">{profile?.service_number || <span className="text-on-surface-variant">—</span>}</dd>
+            </div>
+            <div>
+              <dt className="text-[10px] uppercase tracking-wider text-outline mb-1 font-medium">Region</dt>
+              <dd className="font-medium">{profile?.region || <span className="text-on-surface-variant">—</span>}</dd>
+            </div>
+          </dl>
+        </section>
+
         <section className="col-span-12 bg-card rounded-lg border border-outline-variant border-l-4 border-l-primary p-6">
           <PayoutAccountCard
             userId={user?.id ?? ""}

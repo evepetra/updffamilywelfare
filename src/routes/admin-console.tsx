@@ -20,6 +20,7 @@ type AdminUserRow = {
   email: string | null;
   full_name: string | null;
   service_number: string | null;
+  service: string | null;
   roles: AppRole[] | null;
   created_at: string;
 };
@@ -68,6 +69,9 @@ function AdminConsole() {
   const disburseLockTooltip =
     "Locked for System Administrators. Only Administrators can release funds; system_admin disbursal writes are blocked at the database level (RLS).";
   const [search, setSearch] = useState("");
+  const [serviceFilter, setServiceFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"created_at" | "service" | "full_name">("created_at");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -96,6 +100,7 @@ function AdminConsole() {
     profiles: {
       full_name: string | null;
       service_number: string | null;
+      service: string | null;
       payout_method: string | null;
       payout_provider: string | null;
       payout_account_name: string | null;
@@ -116,12 +121,13 @@ function AdminConsole() {
       if (userIds.length) {
         const { data: profs, error: pErr } = await supabase
           .from("profiles")
-          .select("id, full_name, service_number, payout_method, payout_provider, payout_account_name, payout_account_number")
+          .select("id, full_name, service_number, service, payout_method, payout_provider, payout_account_name, payout_account_number")
           .in("id", userIds);
         if (pErr) throw pErr;
         profilesById = new Map((profs ?? []).map((p) => [p.id, {
           full_name: p.full_name,
           service_number: p.service_number,
+          service: p.service,
           payout_method: p.payout_method,
           payout_provider: p.payout_provider,
           payout_account_name: p.payout_account_name,
@@ -210,14 +216,39 @@ function AdminConsole() {
   const users = usersQuery.data ?? [];
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return users;
-    return users.filter(
-      (u) =>
+    const matched = users.filter((u) => {
+      if (serviceFilter !== "all" && (u.service ?? "") !== serviceFilter) return false;
+      if (!q) return true;
+      return (
         (u.email ?? "").toLowerCase().includes(q) ||
         (u.full_name ?? "").toLowerCase().includes(q) ||
-        (u.service_number ?? "").toLowerCase().includes(q),
-    );
-  }, [users, search]);
+        (u.service_number ?? "").toLowerCase().includes(q) ||
+        (u.service ?? "").toLowerCase().includes(q)
+      );
+    });
+    const sorted = [...matched].sort((a, b) => {
+      const dir = sortDir === "asc" ? 1 : -1;
+      if (sortBy === "service") {
+        return ((a.service ?? "").localeCompare(b.service ?? "")) * dir;
+      }
+      if (sortBy === "full_name") {
+        return ((a.full_name ?? "").localeCompare(b.full_name ?? "")) * dir;
+      }
+      return (a.created_at < b.created_at ? 1 : -1) * dir;
+    });
+    return sorted;
+  }, [users, search, serviceFilter, sortBy, sortDir]);
+
+  function toggleSort(col: "created_at" | "service" | "full_name") {
+    if (sortBy === col) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(col);
+      setSortDir("asc");
+    }
+  }
+
+  const UPDF_SERVICES = ["Air Force", "SFC", "Land Force", "Reserve Force"] as const;
 
   const filteredAudit = useMemo(() => {
     const list = auditQuery.data?.rows ?? [];
@@ -398,6 +429,7 @@ function AdminConsole() {
             <thead className="bg-surface-container-low text-xs uppercase text-on-surface-variant">
               <tr>
                 <th className="px-5 py-3 text-left">Recipient</th>
+                <th className="px-5 py-3 text-left">UPDF Service</th>
                 <th className="px-5 py-3 text-left">Request</th>
                 <th className="px-5 py-3 text-left">Amount (UGX)</th>
                 <th className="px-5 py-3 text-left">Deposit account</th>
@@ -406,10 +438,10 @@ function AdminConsole() {
             </thead>
             <tbody className="divide-y divide-outline-variant">
               {disbursalsQuery.isLoading && (
-                <tr><td colSpan={5} className="px-5 py-6 text-center text-on-surface-variant">Loading…</td></tr>
+                <tr><td colSpan={6} className="px-5 py-6 text-center text-on-surface-variant">Loading…</td></tr>
               )}
               {disbursalsQuery.data?.length === 0 && (
-                <tr><td colSpan={5} className="px-5 py-6 text-center text-on-surface-variant">
+                <tr><td colSpan={6} className="px-5 py-6 text-center text-on-surface-variant">
                   Nothing to disburse. Approved requests will appear here.
                 </td></tr>
               )}
@@ -421,6 +453,16 @@ function AdminConsole() {
                     <td className="px-5 py-3">
                       <div className="font-medium">{p?.full_name ?? "Unknown"}</div>
                       <div className="text-xs text-on-surface-variant font-mono">{p?.service_number ?? "—"}</div>
+                    </td>
+                    <td className="px-5 py-3 text-xs">
+                      {p?.service ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-fixed-dim text-primary font-medium">
+                          <Icon name="military_tech" className="text-[12px]" />
+                          {p.service}
+                        </span>
+                      ) : (
+                        <span className="text-on-surface-variant">—</span>
+                      )}
                     </td>
                     <td className="px-5 py-3">
                       <div className="font-medium">{row.title}</div>
@@ -483,9 +525,21 @@ function AdminConsole() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search name, email or service #"
+              placeholder="Search name, email, service # or UPDF service"
               className="px-3 py-2 text-sm bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary w-full md:w-64"
             />
+            <select
+              value={serviceFilter}
+              onChange={(e) => setServiceFilter(e.target.value)}
+              title="Filter by UPDF Service"
+              className="px-3 py-2 text-sm bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary"
+            >
+              <option value="all">All services</option>
+              {UPDF_SERVICES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+              <option value="">— Unassigned —</option>
+            </select>
           </div>
 
           {selected.size > 0 && (
@@ -538,8 +592,23 @@ function AdminConsole() {
                       }}
                     />
                   </th>
-                  <th className="text-left px-5 py-3 font-medium">User</th>
+                  <th className="text-left px-5 py-3 font-medium">
+                    <button onClick={() => toggleSort("full_name")} className="inline-flex items-center gap-1 hover:text-primary uppercase tracking-wider">
+                      User
+                      {sortBy === "full_name" && (
+                        <Icon name={sortDir === "asc" ? "arrow_upward" : "arrow_downward"} className="text-[12px]" />
+                      )}
+                    </button>
+                  </th>
                   <th className="text-left px-5 py-3 font-medium">Email</th>
+                  <th className="text-left px-5 py-3 font-medium">
+                    <button onClick={() => toggleSort("service")} className="inline-flex items-center gap-1 hover:text-primary uppercase tracking-wider">
+                      UPDF Service
+                      {sortBy === "service" && (
+                        <Icon name={sortDir === "asc" ? "arrow_upward" : "arrow_downward"} className="text-[12px]" />
+                      )}
+                    </button>
+                  </th>
                   <th className="text-center px-3 py-3 font-medium">Sys Admin</th>
                   <th className="text-center px-3 py-3 font-medium">Admin</th>
                   <th className="text-center px-3 py-3 font-medium">Officer</th>
@@ -549,15 +618,15 @@ function AdminConsole() {
               </thead>
               <tbody className="divide-y divide-outline-variant">
                 {usersQuery.isLoading && (
-                  <tr><td colSpan={8} className="text-center py-8 text-on-surface-variant">Loading users…</td></tr>
+                  <tr><td colSpan={9} className="text-center py-8 text-on-surface-variant">Loading users…</td></tr>
                 )}
                 {usersQuery.error && !usersQuery.isLoading && (
-                  <tr><td colSpan={8} className="text-center py-8 text-error">
+                  <tr><td colSpan={9} className="text-center py-8 text-error">
                     {(usersQuery.error as Error).message}
                   </td></tr>
                 )}
                 {!usersQuery.isLoading && filtered.length === 0 && (
-                  <tr><td colSpan={8} className="text-center py-8 text-on-surface-variant">No users match.</td></tr>
+                  <tr><td colSpan={9} className="text-center py-8 text-on-surface-variant">No users match.</td></tr>
                 )}
                 {filtered.map((u) => {
                   const userRoles = u.roles ?? [];
@@ -578,6 +647,16 @@ function AdminConsole() {
                         </p>
                       </td>
                       <td className="px-5 py-3 text-on-surface-variant">{u.email}</td>
+                      <td className="px-5 py-3 text-xs">
+                        {u.service ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-fixed-dim text-primary font-medium">
+                            <Icon name="military_tech" className="text-[12px]" />
+                            {u.service}
+                          </span>
+                        ) : (
+                          <span className="text-on-surface-variant">—</span>
+                        )}
+                      </td>
                       {(["system_admin", "admin", "officer", "soldier", "family"] as AppRole[]).map((role) => {
                         const has = userRoles.includes(role);
                         const key = `${u.id}:${role}`;

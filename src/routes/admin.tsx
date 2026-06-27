@@ -102,6 +102,8 @@ function AdminDashboard() {
   const [ledgerFromDate, setLedgerFromDate] = useState("");
   const [ledgerToDate, setLedgerToDate] = useState("");
   const [ledgerStatusFilter, setLedgerStatusFilter] = useState<string>("all");
+  const [serviceFilter, setServiceFilter] = useState<string>("all");
+  const UPDF_SERVICES = ["Air Force", "SFC", "Land Force", "Reserve Force"] as const;
   // System Administrators may VIEW the Welfare Officer console for oversight,
   // but they cannot approve, reject, or disburse aid — only officers/admins
   // can take action on requests.
@@ -140,10 +142,38 @@ function AdminDashboard() {
   const requests = requestsQuery.data ?? [];
   const ledger = ledgerQuery.data ?? [];
 
+  // Build a map of user_id -> UPDF service for segmenting requests + ledger by service.
+  const requesterIds = useMemo(() => {
+    const ids = new Set<string>();
+    requests.forEach((r) => r.user_id && ids.add(r.user_id));
+    ledger.forEach((l) => l.recipient_user_id && ids.add(l.recipient_user_id));
+    return Array.from(ids);
+  }, [requests, ledger]);
+
+  const servicesQuery = useQuery({
+    queryKey: ["admin-user-services", requesterIds.join(",")],
+    enabled: isStaff && requesterIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, service")
+        .in("id", requesterIds);
+      if (error) throw error;
+      const m = new Map<string, string | null>();
+      (data ?? []).forEach((p) => m.set(p.id, p.service ?? null));
+      return m;
+    },
+  });
+  const serviceByUserId = servicesQuery.data ?? new Map<string, string | null>();
+
   const filteredRequests = useMemo(() => {
     const q = search.trim().toLowerCase();
     return requests.filter((r) => {
       if (pendingOnly && r.status !== "pending" && r.status !== "verifying") return false;
+      if (serviceFilter !== "all") {
+        const svc = serviceByUserId.get(r.user_id) ?? "";
+        if (svc !== serviceFilter) return false;
+      }
       if (!q) return true;
       return (
         (r.title ?? "").toLowerCase().includes(q) ||
@@ -151,7 +181,7 @@ function AdminDashboard() {
         r.id.toLowerCase().includes(q)
       );
     });
-  }, [requests, pendingOnly, search]);
+  }, [requests, pendingOnly, search, serviceFilter, serviceByUserId]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRequests.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -412,6 +442,17 @@ function AdminDashboard() {
                 <Icon name="pending_actions" className="text-[14px]" />
                 Pending only
               </button>
+              <select
+                value={serviceFilter}
+                onChange={(e) => { setServiceFilter(e.target.value); setPage(1); }}
+                title="Segment by UPDF Service"
+                className="px-2 py-2 text-xs border border-outline-variant rounded-md bg-surface-container-low"
+              >
+                <option value="all">All UPDF services</option>
+                {UPDF_SERVICES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
               <button
                 onClick={() => setAuditOpen((o) => !o)}
                 className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md border border-outline-variant hover:bg-surface-container"
@@ -427,6 +468,7 @@ function AdminDashboard() {
                 <tr>
                   <th className="text-left px-5 py-3 font-medium">Title</th>
                   <th className="text-left px-5 py-3 font-medium">Type</th>
+                  <th className="text-left px-5 py-3 font-medium">UPDF Service</th>
                   <th className="text-left px-5 py-3 font-medium">Urgency</th>
                   <th className="text-left px-5 py-3 font-medium">Submitted</th>
                   <th className="text-left px-5 py-3 font-medium">Docs</th>
@@ -436,10 +478,10 @@ function AdminDashboard() {
               </thead>
               <tbody className="divide-y divide-outline-variant">
                 {requestsQuery.isLoading && (
-                  <tr><td colSpan={7} className="text-center py-10 text-on-surface-variant text-sm">Loading…</td></tr>
+                  <tr><td colSpan={8} className="text-center py-10 text-on-surface-variant text-sm">Loading…</td></tr>
                 )}
                 {!requestsQuery.isLoading && filteredRequests.length === 0 && (
-                  <tr><td colSpan={7} className="text-center py-10 text-on-surface-variant text-sm">No requests match the current filter.</td></tr>
+                  <tr><td colSpan={8} className="text-center py-10 text-on-surface-variant text-sm">No requests match the current filter.</td></tr>
                 )}
                 {pagedRequests.map((r) => (
                   <tr key={r.id} className="hover:bg-surface-bright">
@@ -448,6 +490,19 @@ function AdminDashboard() {
                       <p className="text-xs text-outline">#{r.id.slice(0, 8).toUpperCase()}</p>
                     </td>
                     <td className="px-5 py-4">{r.request_type}</td>
+                    <td className="px-5 py-4 text-xs">
+                      {(() => {
+                        const svc = serviceByUserId.get(r.user_id);
+                        return svc ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-fixed-dim text-primary font-medium">
+                            <Icon name="military_tech" className="text-[12px]" />
+                            {svc}
+                          </span>
+                        ) : (
+                          <span className="text-on-surface-variant">—</span>
+                        );
+                      })()}
+                    </td>
                     <td className="px-5 py-4 capitalize">{r.urgency}</td>
                     <td className="px-5 py-4 text-on-surface-variant">
                       {new Date(r.created_at).toLocaleDateString()}
@@ -696,12 +751,26 @@ function AdminDashboard() {
                 <option value="disbursed">Disbursed</option>
               </select>
             </label>
-            {(ledgerFromDate || ledgerToDate || ledgerStatusFilter !== "all") && (
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="font-medium text-on-surface-variant">UPDF Service</span>
+              <select
+                value={serviceFilter}
+                onChange={(e) => setServiceFilter(e.target.value)}
+                className="px-2 py-1.5 border border-outline-variant rounded-md bg-surface-container-low text-sm"
+              >
+                <option value="all">All services</option>
+                {UPDF_SERVICES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </label>
+            {(ledgerFromDate || ledgerToDate || ledgerStatusFilter !== "all" || serviceFilter !== "all") && (
               <button
                 onClick={() => {
                   setLedgerFromDate("");
                   setLedgerToDate("");
                   setLedgerStatusFilter("all");
+                  setServiceFilter("all");
                 }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-outline-variant hover:bg-surface-container"
               >
@@ -717,6 +786,7 @@ function AdminDashboard() {
                   <th className="text-left px-5 py-3 font-medium">Date</th>
                   <th className="text-left px-5 py-3 font-medium">Recipient</th>
                   <th className="text-left px-5 py-3 font-medium">Region</th>
+                  <th className="text-left px-5 py-3 font-medium">UPDF Service</th>
                   <th className="text-left px-5 py-3 font-medium">Aid Type</th>
                   <th className="text-left px-5 py-3 font-medium">Deposit Account</th>
                   <th className="text-right px-5 py-3 font-medium">Amount (UGX)</th>
@@ -725,13 +795,17 @@ function AdminDashboard() {
               </thead>
               <tbody className="divide-y divide-outline-variant">
                 {ledgerQuery.isLoading && (
-                  <tr><td colSpan={7} className="text-center py-8 text-on-surface-variant text-sm">Loading…</td></tr>
+                  <tr><td colSpan={8} className="text-center py-8 text-on-surface-variant text-sm">Loading…</td></tr>
                 )}
                 {(() => {
                   const fromTs = ledgerFromDate ? new Date(ledgerFromDate + "T00:00:00").getTime() : null;
                   const toTs = ledgerToDate ? new Date(ledgerToDate + "T23:59:59").getTime() : null;
                   const filtered = ledger.filter((l) => {
                     if (ledgerStatusFilter !== "all" && l.status !== ledgerStatusFilter) return false;
+                    if (serviceFilter !== "all") {
+                      const svc = serviceByUserId.get(l.recipient_user_id) ?? "";
+                      if (svc !== serviceFilter) return false;
+                    }
                     const d = new Date(l.disbursed_at ?? l.created_at).getTime();
                     if (fromTs !== null && d < fromTs) return false;
                     if (toTs !== null && d > toTs) return false;
@@ -739,7 +813,7 @@ function AdminDashboard() {
                   });
                   if (!ledgerQuery.isLoading && filtered.length === 0) {
                     return (
-                      <tr><td colSpan={7} className="text-center py-8 text-on-surface-variant text-sm">No disbursals match the current filters.</td></tr>
+                      <tr><td colSpan={8} className="text-center py-8 text-on-surface-variant text-sm">No disbursals match the current filters.</td></tr>
                     );
                   }
                   return filtered.slice(0, 50).map((l) => (
@@ -749,6 +823,19 @@ function AdminDashboard() {
                     </td>
                     <td className="px-5 py-3 font-medium">{l.recipient_name}</td>
                     <td className="px-5 py-3">{l.region}</td>
+                    <td className="px-5 py-3 text-xs">
+                      {(() => {
+                        const svc = serviceByUserId.get(l.recipient_user_id);
+                        return svc ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-fixed-dim text-primary font-medium">
+                            <Icon name="military_tech" className="text-[12px]" />
+                            {svc}
+                          </span>
+                        ) : (
+                          <span className="text-on-surface-variant">—</span>
+                        );
+                      })()}
+                    </td>
                     <td className="px-5 py-3">{l.aid_type}</td>
                     <td className="px-5 py-3 text-xs">
                       {l.payout_account_number ? (
