@@ -298,6 +298,48 @@ function AdminConsole() {
     URL.revokeObjectURL(url);
   }
 
+  function exportMembersCsv() {
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    downloadCsv(
+      `updf-members-${ts}.csv`,
+      buildMembersCsv(
+        filtered.map((u) => ({
+          id: u.id,
+          email: u.email,
+          full_name: u.full_name,
+          service_number: u.service_number,
+          service: u.service,
+          roles: u.roles ?? [],
+          created_at: u.created_at,
+        })),
+      ),
+    );
+  }
+
+  function exportPendingDisbursalsCsv() {
+    const rows = disbursalsQuery.data ?? [];
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    downloadCsv(
+      `pending-disbursals-${ts}.csv`,
+      buildDisbursementsCsv(
+        rows.map((r) => ({
+          id: r.id,
+          date: r.updated_at,
+          recipient_name: r.profiles?.full_name ?? null,
+          region: null,
+          service: r.profiles?.service ?? null,
+          aid_type: r.request_type,
+          payout_method: r.profiles?.payout_method ?? null,
+          payout_provider: r.profiles?.payout_provider ?? null,
+          payout_account_name: r.profiles?.payout_account_name ?? null,
+          payout_account_number: r.profiles?.payout_account_number ?? null,
+          amount: r.amount_approved ?? "",
+          status: "approved",
+        })),
+      ),
+    );
+  }
+
   const sysAdmins = users.filter((u) => u.roles?.includes("system_admin")).length;
   const admins = users.filter((u) => u.roles?.includes("admin")).length;
   const officers = users.filter((u) => u.roles?.includes("officer")).length;
