@@ -679,6 +679,207 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
   );
 }
 
+function FamilyMemberDetailsCard({
+  userId,
+  payout,
+}: {
+  userId: string;
+  payout: PayoutInfo;
+}) {
+  const qc = useQueryClient();
+  const q = useQuery({
+    queryKey: ["my-family-member", userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select(
+          "family_member_full_name, family_member_nin, family_member_region, family_member_relationship",
+        )
+        .eq("id", userId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+  const initial = q.data;
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState("");
+  const [nin, setNin] = useState("");
+  const [region, setRegion] = useState("");
+  const [rel, setRel] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    setName(initial?.family_member_full_name ?? "");
+    setNin(initial?.family_member_nin ?? "");
+    setRegion(initial?.family_member_region ?? "");
+    setRel(initial?.family_member_relationship ?? "");
+  }, [initial]);
+
+  const hasData = !!(initial?.family_member_full_name || initial?.family_member_nin);
+  const accountNumber = payout?.payout_account_number ?? null;
+  const paymentMethod = payout?.payout_method
+    ? payout.payout_method === "mobile_money"
+      ? `Mobile Money${payout.payout_provider ? ` · ${payout.payout_provider}` : ""}`
+      : `Bank${payout.payout_provider ? ` · ${payout.payout_provider}` : ""}`
+    : null;
+
+  async function save() {
+    if (!userId) return;
+    setErr(null);
+    const trimmedNin = nin.trim().toUpperCase();
+    if (trimmedNin && !/^C[MF][A-Z0-9]{12}$/.test(trimmedNin)) {
+      setErr("NIN must be 14 characters starting with CM or CF.");
+      return;
+    }
+    if (region && !REGIONS.includes(region)) {
+      setErr("Choose a valid region.");
+      return;
+    }
+    if (rel && !RELATIONSHIPS.includes(rel)) {
+      setErr("Choose a valid relationship.");
+      return;
+    }
+    setBusy(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        family_member_full_name: name.trim() || null,
+        family_member_nin: trimmedNin || null,
+        family_member_region: region || null,
+        family_member_relationship: rel || null,
+      })
+      .eq("id", userId);
+    setBusy(false);
+    if (error) {
+      setErr(error.message);
+      toast.error("Could not save family details", { description: error.message });
+      return;
+    }
+    setEditing(false);
+    toast.success("Family member details updated");
+    qc.invalidateQueries({ queryKey: ["my-family-member", userId] });
+  }
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-semibold text-primary flex items-center gap-2">
+            <Icon name="diversity_3" fill className="text-[22px]" />
+            Family Member Details
+          </h2>
+          <p className="text-xs text-on-surface-variant mt-0.5">
+            Record the family member linked to your welfare account. Account number and payment method are auto-fetched from your aid deposit account.
+          </p>
+        </div>
+        {!editing && (
+          <button
+            onClick={() => setEditing(true)}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary border border-primary px-3 py-1.5 rounded-md hover:bg-primary hover:text-on-primary"
+          >
+            <Icon name={hasData ? "edit" : "add"} className="text-[16px]" />
+            {hasData ? "Update" : "Add details"}
+          </button>
+        )}
+      </div>
+      {!editing ? (
+        hasData ? (
+          <dl className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <Field label="Full Name" value={initial?.family_member_full_name || "—"} />
+            <Field label="NIN" value={initial?.family_member_nin || "—"} mono />
+            <Field label="Region" value={initial?.family_member_region || "—"} />
+            <Field label="Relationship" value={initial?.family_member_relationship || "—"} />
+            <LockedField label="Account number (auto)" value={accountNumber || "—"} mono />
+            <LockedField label="Payment method (auto)" value={paymentMethod || "—"} />
+          </dl>
+        ) : (
+          <p className="mt-4 text-sm text-on-surface-variant">
+            No family member on file yet. Add their details so welfare aid can be routed correctly.
+          </p>
+        )
+      ) : (
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+          <label className="text-xs">
+            <span className="block mb-1 text-on-surface-variant">Full Name</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+            />
+          </label>
+          <label className="text-xs">
+            <span className="block mb-1 text-on-surface-variant">NIN</span>
+            <input
+              value={nin}
+              onChange={(e) => setNin(e.target.value.toUpperCase())}
+              maxLength={14}
+              placeholder="CM/CF + 12 chars"
+              className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm font-mono uppercase"
+            />
+          </label>
+          <label className="text-xs">
+            <span className="block mb-1 text-on-surface-variant">Region</span>
+            <select
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+            >
+              <option value="">—</option>
+              {REGIONS.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs">
+            <span className="block mb-1 text-on-surface-variant">Relationship</span>
+            <select
+              value={rel}
+              onChange={(e) => setRel(e.target.value)}
+              className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+            >
+              <option value="">—</option>
+              <optgroup label="Primary">
+                {["Father","Mother","Wife","Husband","Son","Daughter"].map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Adopted / Extended">
+                {["Brother","Sister","Aunt","Uncle","Cousin","Other"].map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </optgroup>
+            </select>
+          </label>
+          <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <LockedField label="Account number (auto-fetched)" value={accountNumber || "Not set — add it in Aid Deposit Account"} mono />
+            <LockedField label="Payment method (auto-fetched)" value={paymentMethod || "Not set — add it in Aid Deposit Account"} />
+          </div>
+          {err && <p className="md:col-span-2 text-sm text-error">{err}</p>}
+          <div className="md:col-span-2 flex justify-end gap-2 mt-1">
+            <button
+              onClick={() => setEditing(false)}
+              disabled={busy}
+              className="px-4 py-2 text-sm border border-outline-variant rounded-md hover:bg-surface-container"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              disabled={busy}
+              className="px-4 py-2 text-sm font-semibold bg-primary text-on-primary rounded-md hover:bg-primary-container disabled:opacity-50"
+            >
+              {busy ? "Saving…" : "Save details"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LockedField({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div
