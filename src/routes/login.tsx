@@ -58,6 +58,15 @@ const UPDF_RANKS = [
   "General",
 ] as const;
 
+// UPDF service regions (also constrained on profiles.region in the database)
+const UPDF_REGIONS = [
+  "Central",
+  "Western",
+  "Northern",
+  "Eastern",
+  "West Nile",
+] as const;
+
 const signInSchema = z.object({
   email: z
     .string()
@@ -82,6 +91,12 @@ const baseSignUpSchema = signInSchema.extend({
     .toUpperCase()
     .regex(NIN_REGEX, {
       message: "Enter a valid 14-character National ID (e.g. CM12345678ABCD)",
+    }),
+  region: z
+    .string()
+    .trim()
+    .refine((v) => (UPDF_REGIONS as readonly string[]).includes(v), {
+      message: "Select your region",
     }),
 });
 
