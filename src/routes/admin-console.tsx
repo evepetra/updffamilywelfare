@@ -599,6 +599,16 @@ function AdminConsole() {
               ))}
               <option value="">— Unassigned —</option>
             </select>
+            <button
+              type="button"
+              onClick={exportMembersCsv}
+              disabled={filtered.length === 0}
+              title="Export filtered members to CSV (includes UPDF Service)"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-md border border-primary text-primary hover:bg-primary hover:text-on-primary disabled:opacity-40"
+            >
+              <Icon name="download" className="text-[14px]" />
+              Export CSV
+            </button>
           </div>
 
           {selected.size > 0 && (
