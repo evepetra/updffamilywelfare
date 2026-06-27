@@ -9,7 +9,13 @@ export interface AuthState {
   loading: boolean;
   session: Session | null;
   user: User | null;
-  profile: { full_name: string | null; service_number: string | null } | null;
+  profile: {
+    full_name: string | null;
+    service_number: string | null;
+    service: string | null;
+    rank: string | null;
+    region: string | null;
+  } | null;
   roles: Role[];
   isFamily: boolean;
   isSoldier: boolean;
@@ -33,7 +39,11 @@ export function useAuth(redirectIfUnauthed = true): AuthState {
 
     const loadExtras = async (uid: string) => {
       const [{ data: prof }, { data: rs }] = await Promise.all([
-        supabase.from("profiles").select("full_name, service_number").eq("id", uid).maybeSingle(),
+        supabase
+          .from("profiles")
+          .select("full_name, service_number, service, rank, region")
+          .eq("id", uid)
+          .maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", uid),
       ]);
       if (!active) return;
