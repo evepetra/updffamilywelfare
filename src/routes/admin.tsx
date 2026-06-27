@@ -557,6 +557,66 @@ function AdminDashboard() {
             </div>
           </section>
         )}
+
+        {/* Disbursed Aid Report — read-only ledger view for the welfare officer */}
+        <section className="col-span-12 bg-card border border-outline-variant rounded-lg overflow-hidden">
+          <div className="p-5 border-b border-outline-variant flex flex-wrap justify-between items-center gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-primary flex items-center gap-2">
+                <Icon name="payments" fill className="text-[20px]" />
+                Disbursed Aid Report
+              </h2>
+              <p className="text-xs text-on-surface-variant">
+                {ledger.filter((l) => l.status === "disbursed").length} disbursals · {fmtCompactUGX(
+                  ledger.filter((l) => l.status === "disbursed").reduce((s, l) => s + Number(l.amount || 0), 0),
+                )} released
+              </p>
+            </div>
+            <Link
+              to="/ledger"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-outline-variant hover:bg-surface-container"
+            >
+              <Icon name="open_in_new" className="text-[14px]" />
+              Open full ledger
+            </Link>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-surface-container-low text-on-surface-variant text-xs uppercase tracking-wider">
+                <tr>
+                  <th className="text-left px-5 py-3 font-medium">Date</th>
+                  <th className="text-left px-5 py-3 font-medium">Recipient</th>
+                  <th className="text-left px-5 py-3 font-medium">Region</th>
+                  <th className="text-left px-5 py-3 font-medium">Aid Type</th>
+                  <th className="text-right px-5 py-3 font-medium">Amount (UGX)</th>
+                  <th className="text-left px-5 py-3 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant">
+                {ledgerQuery.isLoading && (
+                  <tr><td colSpan={6} className="text-center py-8 text-on-surface-variant text-sm">Loading…</td></tr>
+                )}
+                {!ledgerQuery.isLoading && ledger.length === 0 && (
+                  <tr><td colSpan={6} className="text-center py-8 text-on-surface-variant text-sm">No disbursals recorded yet.</td></tr>
+                )}
+                {ledger.slice(0, 25).map((l) => (
+                  <tr key={l.id} className="hover:bg-surface-bright">
+                    <td className="px-5 py-3 text-on-surface-variant whitespace-nowrap">
+                      {new Date(l.disbursed_at ?? l.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-5 py-3 font-medium">{l.recipient_name}</td>
+                    <td className="px-5 py-3">{l.region}</td>
+                    <td className="px-5 py-3">{l.aid_type}</td>
+                    <td className="px-5 py-3 text-right font-mono">
+                      {Number(l.amount || 0).toLocaleString("en-UG")}
+                    </td>
+                    <td className="px-5 py-3"><StatusPill status={l.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
 
     </AppShell>
