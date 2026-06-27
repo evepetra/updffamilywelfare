@@ -166,6 +166,7 @@ export type Database = {
           payout_method: string | null
           payout_provider: string | null
           rank: string | null
+          region: string | null
           service_number: string | null
           updated_at: string
         }
@@ -180,6 +181,7 @@ export type Database = {
           payout_method?: string | null
           payout_provider?: string | null
           rank?: string | null
+          region?: string | null
           service_number?: string | null
           updated_at?: string
         }
@@ -194,6 +196,7 @@ export type Database = {
           payout_method?: string | null
           payout_provider?: string | null
           rank?: string | null
+          region?: string | null
           service_number?: string | null
           updated_at?: string
         }
