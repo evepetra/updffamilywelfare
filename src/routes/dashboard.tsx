@@ -29,7 +29,7 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function FamilyDashboard() {
-  const { user, profile } = useAuth();
+  const { user, profile, isSoldier } = useAuth();
   const qc = useQueryClient();
 
   const payoutQuery = useQuery({
@@ -99,47 +99,12 @@ function FamilyDashboard() {
       <div className="grid grid-cols-12 gap-6">
         {/* Identity card — visible to every member; shows the UPDF service a soldier is under */}
         <section className="col-span-12 bg-card rounded-lg border border-outline-variant p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-semibold text-primary flex items-center gap-2">
-                <Icon name="badge" fill className="text-[22px]" />
-                My UPDF Profile
-              </h2>
-              <p className="text-xs text-on-surface-variant mt-0.5">
-                Your service identification on file with the welfare directorate.
-              </p>
-            </div>
-            {profile?.service && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-on-primary text-xs font-semibold">
-                <Icon name="military_tech" fill className="text-[14px]" />
-                {profile.service}
-              </span>
-            )}
-          </div>
-          <dl className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <dt className="text-[10px] uppercase tracking-wider text-outline mb-1 font-medium">Full name</dt>
-              <dd className="font-medium">{profile?.full_name || "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-[10px] uppercase tracking-wider text-outline mb-1 font-medium">UPDF Service</dt>
-              <dd className="font-medium">
-                {profile?.service ? profile.service : <span className="text-on-surface-variant">Not assigned</span>}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[10px] uppercase tracking-wider text-outline mb-1 font-medium">Rank</dt>
-              <dd className="font-medium">{profile?.rank || <span className="text-on-surface-variant">—</span>}</dd>
-            </div>
-            <div>
-              <dt className="text-[10px] uppercase tracking-wider text-outline mb-1 font-medium">Service / Army #</dt>
-              <dd className="font-mono font-medium">{profile?.service_number || <span className="text-on-surface-variant">—</span>}</dd>
-            </div>
-            <div>
-              <dt className="text-[10px] uppercase tracking-wider text-outline mb-1 font-medium">Region</dt>
-              <dd className="font-medium">{profile?.region || <span className="text-on-surface-variant">—</span>}</dd>
-            </div>
-          </dl>
+          <ProfileDetailsCard
+            userId={user?.id ?? ""}
+            isSoldier={isSoldier}
+            initial={profile}
+            onSaved={() => qc.invalidateQueries({ queryKey: ["my-payout"] })}
+          />
         </section>
 
         <section className="col-span-12 bg-card rounded-lg border border-outline-variant border-l-4 border-l-primary p-6">
@@ -510,6 +475,191 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
     <div>
       <dt className="text-[10px] uppercase tracking-wider text-outline font-medium">{label}</dt>
       <dd className={"mt-0.5 text-on-surface " + (mono ? "font-mono text-sm" : "")}>{value}</dd>
+    </div>
+  );
+}
+
+type ProfileInfo = {
+  full_name: string | null;
+  service_number: string | null;
+  service: string | null;
+  rank: string | null;
+  region: string | null;
+} | null;
+
+const RANKS = [
+  "Private","Lance Corporal","Corporal","Sergeant","Staff Sergeant","Warrant Officer II","Warrant Officer I",
+  "Second Lieutenant","Lieutenant","Captain","Major","Lieutenant Colonel","Colonel","Brigadier","Major General","Lieutenant General","General",
+];
+const REGIONS = ["Central","Western","Northern","Eastern","West Nile"];
+const SERVICES = ["Air Force","SFC","Land Force","Reserve Force"];
+
+function ProfileDetailsCard({
+  userId,
+  isSoldier,
+  initial,
+  onSaved,
+}: {
+  userId: string;
+  isSoldier: boolean;
+  initial: ProfileInfo;
+  onSaved: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [fullName, setFullName] = useState(initial?.full_name ?? "");
+  const [rank, setRank] = useState(initial?.rank ?? "");
+  const [region, setRegion] = useState(initial?.region ?? "");
+  const [service, setService] = useState(initial?.service ?? "");
+  const [snapshot, setSnapshot] = useState<ProfileInfo>(initial);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSnapshot(initial);
+    setFullName(initial?.full_name ?? "");
+    setRank(initial?.rank ?? "");
+    setRegion(initial?.region ?? "");
+    setService(initial?.service ?? "");
+  }, [initial]);
+
+  async function save() {
+    if (!userId) return;
+    setBusy(true);
+    setErr(null);
+    const payload = {
+      full_name: fullName.trim() || null,
+      rank: rank.trim() || null,
+      region: region.trim() || null,
+      ...(isSoldier ? { service: service.trim() || null } : {}),
+    };
+    const { error } = await supabase.from("profiles").update(payload).eq("id", userId);
+    setBusy(false);
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+    setSnapshot({
+      full_name: payload.full_name,
+      service_number: snapshot?.service_number ?? null,
+      service: isSoldier ? service.trim() || null : snapshot?.service ?? null,
+      rank: payload.rank,
+      region: payload.region,
+    });
+    setEditing(false);
+    onSaved();
+  }
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-semibold text-primary flex items-center gap-2">
+            <Icon name="badge" fill className="text-[22px]" />
+            My UPDF Profile
+          </h2>
+          <p className="text-xs text-on-surface-variant mt-0.5">
+            Your service identification on file with the welfare directorate.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {snapshot?.service && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-on-primary text-xs font-semibold">
+              <Icon name="military_tech" fill className="text-[14px]" />
+              {snapshot.service}
+            </span>
+          )}
+          {!editing && (
+            <button
+              onClick={() => setEditing(true)}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-primary border border-primary px-3 py-1.5 rounded-md hover:bg-primary hover:text-on-primary"
+            >
+              <Icon name="edit" className="text-[16px]" />
+              Edit details
+            </button>
+          )}
+        </div>
+      </div>
+      {!editing ? (
+        <dl className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <Field label="Full name" value={snapshot?.full_name || "—"} />
+          <Field label="UPDF Service" value={snapshot?.service || "Not assigned"} />
+          <Field label="Rank" value={snapshot?.rank || "—"} />
+          <Field label="Service / Army #" value={snapshot?.service_number || "—"} mono />
+          <Field label="Region" value={snapshot?.region || "—"} />
+        </dl>
+      ) : (
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+          <label className="text-xs">
+            <span className="block mb-1 text-on-surface-variant">Full name</span>
+            <input
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+            />
+          </label>
+          <label className="text-xs">
+            <span className="block mb-1 text-on-surface-variant">Rank</span>
+            <select
+              value={rank}
+              onChange={(e) => setRank(e.target.value)}
+              className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+            >
+              <option value="">—</option>
+              {RANKS.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs">
+            <span className="block mb-1 text-on-surface-variant">Region</span>
+            <select
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+            >
+              <option value="">—</option>
+              {REGIONS.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </label>
+          {isSoldier && (
+            <label className="text-xs">
+              <span className="block mb-1 text-on-surface-variant">UPDF Service</span>
+              <select
+                value={service}
+                onChange={(e) => setService(e.target.value)}
+                className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+              >
+                <option value="">—</option>
+                {SERVICES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          <div className="md:col-span-2 text-[11px] text-on-surface-variant">
+            Identity fields (NIN, Army Number, Service Number) cannot be changed here. Contact a welfare officer if they need correcting.
+          </div>
+          {err && <p className="md:col-span-2 text-sm text-error">{err}</p>}
+          <div className="md:col-span-2 flex justify-end gap-2 mt-1">
+            <button
+              onClick={() => setEditing(false)}
+              disabled={busy}
+              className="px-4 py-2 text-sm border border-outline-variant rounded-md hover:bg-surface-container"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              disabled={busy}
+              className="px-4 py-2 text-sm font-semibold bg-primary text-on-primary rounded-md hover:bg-primary-container disabled:opacity-50"
+            >
+              {busy ? "Saving…" : "Save details"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
