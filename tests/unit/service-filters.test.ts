@@ -60,12 +60,12 @@ test("Admin Console: free-text search matches UPDF service value", () => {
 });
 test("Admin Console: sort members by UPDF Service ascending", () => {
   const r = filterAndSortMembers(members, { sortBy: "service", sortDir: "asc" });
-  // null service sorts as empty string, so u4 first
-  eq(r.map((u) => u.service), ["", "Air Force", "Air Force", "Land Force", "SFC"]);
+  // null service sorts as empty string, so u4 (null) first
+  eq(r.map((u) => u.service), [null, "Air Force", "Air Force", "Land Force", "SFC"]);
 });
 test("Admin Console: sort members by UPDF Service descending", () => {
   const r = filterAndSortMembers(members, { sortBy: "service", sortDir: "desc" });
-  eq(r.map((u) => u.service), ["SFC", "Land Force", "Air Force", "Air Force", ""]);
+  eq(r.map((u) => u.service), ["SFC", "Land Force", "Air Force", "Air Force", null]);
 });
 test("Admin Console: 'all' service filter returns every member", () => {
   const r = filterAndSortMembers(members, { serviceFilter: "all" });
