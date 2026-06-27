@@ -696,6 +696,7 @@ const RELATIONSHIPS = [
 function ProfileDetailsCard({
   userId,
   isSoldier,
+  email,
   initial,
   onSaved,
 }: {
