@@ -606,6 +606,110 @@ function AdminDashboard() {
               Open full ledger
             </Link>
           </div>
+          {/* Status summary tiles */}
+          {(() => {
+            const summary = ledger.reduce(
+              (acc, l) => {
+                const s = String(l.status ?? "");
+                const amt = Number(l.amount || 0);
+                if (s === "pending") { acc.pending.count++; acc.pending.amount += amt; }
+                else if (s === "approved") { acc.approved.count++; acc.approved.amount += amt; }
+                else if (s === "disbursed") { acc.disbursed.count++; acc.disbursed.amount += amt; }
+                return acc;
+              },
+              {
+                pending: { count: 0, amount: 0 },
+                approved: { count: 0, amount: 0 },
+                disbursed: { count: 0, amount: 0 },
+              },
+            );
+            const tiles: Array<{ key: string; label: string; icon: string; tint: string; data: { count: number; amount: number } }> = [
+              { key: "pending", label: "Pending", icon: "hourglass_top", tint: "bg-secondary-container text-on-secondary-container", data: summary.pending },
+              { key: "approved", label: "Approved (awaiting release)", icon: "verified", tint: "bg-primary-fixed-dim text-primary", data: summary.approved },
+              { key: "disbursed", label: "Disbursed", icon: "paid", tint: "bg-primary text-on-primary", data: summary.disbursed },
+            ];
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-5 border-b border-outline-variant bg-surface-container-low/40">
+                {tiles.map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => setLedgerStatusFilter(t.key)}
+                    className={
+                      "text-left rounded-lg border p-4 hover:bg-surface-container transition-colors " +
+                      (ledgerStatusFilter === t.key
+                        ? "border-primary ring-2 ring-primary/30"
+                        : "border-outline-variant")
+                    }
+                    title={`Filter report to ${t.label}`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs uppercase tracking-wider font-medium text-on-surface-variant">{t.label}</span>
+                      <span className={"w-8 h-8 rounded-md flex items-center justify-center " + t.tint}>
+                        <Icon name={t.icon} fill className="text-[16px]" />
+                      </span>
+                    </div>
+                    <p className="text-xl font-bold text-primary">{t.data.count}</p>
+                    <p className="text-xs text-on-surface-variant mt-0.5">{fmtCompactUGX(t.data.amount)}</p>
+                    <Link
+                      to="/ledger"
+                      className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      View details
+                      <Icon name="arrow_forward" className="text-[12px]" />
+                    </Link>
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+          {/* Filters */}
+          <div className="flex flex-wrap items-end gap-3 p-4 border-b border-outline-variant bg-surface-container-low/30">
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="font-medium text-on-surface-variant">From date</span>
+              <input
+                type="date"
+                value={ledgerFromDate}
+                onChange={(e) => setLedgerFromDate(e.target.value)}
+                className="px-2 py-1.5 border border-outline-variant rounded-md bg-surface-container-low text-sm"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="font-medium text-on-surface-variant">To date</span>
+              <input
+                type="date"
+                value={ledgerToDate}
+                onChange={(e) => setLedgerToDate(e.target.value)}
+                className="px-2 py-1.5 border border-outline-variant rounded-md bg-surface-container-low text-sm"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="font-medium text-on-surface-variant">Status</span>
+              <select
+                value={ledgerStatusFilter}
+                onChange={(e) => setLedgerStatusFilter(e.target.value)}
+                className="px-2 py-1.5 border border-outline-variant rounded-md bg-surface-container-low text-sm"
+              >
+                <option value="all">All</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="disbursed">Disbursed</option>
+              </select>
+            </label>
+            {(ledgerFromDate || ledgerToDate || ledgerStatusFilter !== "all") && (
+              <button
+                onClick={() => {
+                  setLedgerFromDate("");
+                  setLedgerToDate("");
+                  setLedgerStatusFilter("all");
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-outline-variant hover:bg-surface-container"
+              >
+                <Icon name="filter_alt_off" className="text-[14px]" />
+                Clear filters
+              </button>
+            )}
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-surface-container-low text-on-surface-variant text-xs uppercase tracking-wider">
@@ -622,10 +726,22 @@ function AdminDashboard() {
                 {ledgerQuery.isLoading && (
                   <tr><td colSpan={6} className="text-center py-8 text-on-surface-variant text-sm">Loading…</td></tr>
                 )}
-                {!ledgerQuery.isLoading && ledger.length === 0 && (
-                  <tr><td colSpan={6} className="text-center py-8 text-on-surface-variant text-sm">No disbursals recorded yet.</td></tr>
-                )}
-                {ledger.slice(0, 25).map((l) => (
+                {(() => {
+                  const fromTs = ledgerFromDate ? new Date(ledgerFromDate + "T00:00:00").getTime() : null;
+                  const toTs = ledgerToDate ? new Date(ledgerToDate + "T23:59:59").getTime() : null;
+                  const filtered = ledger.filter((l) => {
+                    if (ledgerStatusFilter !== "all" && l.status !== ledgerStatusFilter) return false;
+                    const d = new Date(l.disbursed_at ?? l.created_at).getTime();
+                    if (fromTs !== null && d < fromTs) return false;
+                    if (toTs !== null && d > toTs) return false;
+                    return true;
+                  });
+                  if (!ledgerQuery.isLoading && filtered.length === 0) {
+                    return (
+                      <tr><td colSpan={6} className="text-center py-8 text-on-surface-variant text-sm">No disbursals match the current filters.</td></tr>
+                    );
+                  }
+                  return filtered.slice(0, 50).map((l) => (
                   <tr key={l.id} className="hover:bg-surface-bright">
                     <td className="px-5 py-3 text-on-surface-variant whitespace-nowrap">
                       {new Date(l.disbursed_at ?? l.created_at).toLocaleDateString()}
@@ -638,7 +754,8 @@ function AdminDashboard() {
                     </td>
                     <td className="px-5 py-3"><StatusPill status={l.status} /></td>
                   </tr>
-                ))}
+                  ));
+                })()}
               </tbody>
             </table>
           </div>
