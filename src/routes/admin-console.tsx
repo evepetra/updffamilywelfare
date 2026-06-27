@@ -429,6 +429,7 @@ function AdminConsole() {
             <thead className="bg-surface-container-low text-xs uppercase text-on-surface-variant">
               <tr>
                 <th className="px-5 py-3 text-left">Recipient</th>
+                <th className="px-5 py-3 text-left">UPDF Service</th>
                 <th className="px-5 py-3 text-left">Request</th>
                 <th className="px-5 py-3 text-left">Amount (UGX)</th>
                 <th className="px-5 py-3 text-left">Deposit account</th>
@@ -437,10 +438,10 @@ function AdminConsole() {
             </thead>
             <tbody className="divide-y divide-outline-variant">
               {disbursalsQuery.isLoading && (
-                <tr><td colSpan={5} className="px-5 py-6 text-center text-on-surface-variant">Loading…</td></tr>
+                <tr><td colSpan={6} className="px-5 py-6 text-center text-on-surface-variant">Loading…</td></tr>
               )}
               {disbursalsQuery.data?.length === 0 && (
-                <tr><td colSpan={5} className="px-5 py-6 text-center text-on-surface-variant">
+                <tr><td colSpan={6} className="px-5 py-6 text-center text-on-surface-variant">
                   Nothing to disburse. Approved requests will appear here.
                 </td></tr>
               )}
@@ -452,6 +453,16 @@ function AdminConsole() {
                     <td className="px-5 py-3">
                       <div className="font-medium">{p?.full_name ?? "Unknown"}</div>
                       <div className="text-xs text-on-surface-variant font-mono">{p?.service_number ?? "—"}</div>
+                    </td>
+                    <td className="px-5 py-3 text-xs">
+                      {p?.service ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-fixed-dim text-primary font-medium">
+                          <Icon name="military_tech" className="text-[12px]" />
+                          {p.service}
+                        </span>
+                      ) : (
+                        <span className="text-on-surface-variant">—</span>
+                      )}
                     </td>
                     <td className="px-5 py-3">
                       <div className="font-medium">{row.title}</div>
