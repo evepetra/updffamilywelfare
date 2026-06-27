@@ -499,6 +499,11 @@ const RANKS = [
 const REGIONS = ["Central","Western","Northern","Eastern","West Nile"];
 const SERVICES = ["Air Force","SFC","Land Force","Reserve Force"];
 
+const RELATIONSHIPS = [
+  "Father","Mother","Wife","Husband","Son","Daughter",
+  "Brother","Sister","Aunt","Uncle","Cousin","Other",
+];
+
 function ProfileDetailsCard({
   userId,
   isSoldier,
@@ -560,7 +565,7 @@ function ProfileDetailsCard({
         <div>
           <h2 className="text-xl font-semibold text-primary flex items-center gap-2">
             <Icon name="badge" fill className="text-[22px]" />
-            My UPDF Profile
+            My Profile
           </h2>
           <p className="text-xs text-on-surface-variant mt-0.5">
             Your service identification on file with the welfare directorate.
