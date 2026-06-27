@@ -447,6 +447,58 @@ function SupportPage() {
                 </div>
               ) : (
                 <>
+                  <h3 className="text-sm font-semibold text-on-surface mb-3">Family Member Details</h3>
+                  <p className="text-xs text-on-surface-variant mb-3">
+                    Provide the details of the family member who will receive the aid.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                      <label className="block text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wider">
+                        Full Name of Family Member
+                      </label>
+                      <input
+                        value={familyFullName}
+                        onChange={(e) => setFamilyFullName(e.target.value)}
+                        placeholder="e.g. Jane Doe"
+                        className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wider">
+                        Phone
+                      </label>
+                      <input
+                        value={familyPhone}
+                        onChange={(e) => setFamilyPhone(e.target.value)}
+                        placeholder="e.g. +256 700 000 000"
+                        className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wider">
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        value={familyEmail}
+                        onChange={(e) => setFamilyEmail(e.target.value)}
+                        placeholder="optional"
+                        className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wider">
+                        National ID (NIN) — Optional
+                      </label>
+                      <input
+                        value={familyNin}
+                        onChange={(e) => setFamilyNin(e.target.value.toUpperCase())}
+                        placeholder="e.g. CM12345678ABCD"
+                        className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+
                   <h3 className="text-sm font-semibold text-on-surface mb-3">My Profile</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                     <ReadOnly label="Full Name" value={profile?.full_name || "—"} />
@@ -466,6 +518,9 @@ function SupportPage() {
                   </div>
 
                   <h3 className="text-sm font-semibold text-on-surface mb-3">Soldier Relationship Details</h3>
+                  <p className="text-xs text-on-surface-variant mb-3">
+                    Enter the soldier's service number — name, rank, and branch will be auto-fetched.
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wider">
@@ -491,17 +546,6 @@ function SupportPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wider">
-                        Soldier's Full Name
-                      </label>
-                      <input
-                        value={soldierFullName}
-                        onChange={(e) => setSoldierFullName(e.target.value)}
-                        placeholder="e.g. John Doe"
-                        className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wider">
                         Soldier's Service Number
                       </label>
                       <input
@@ -510,33 +554,23 @@ function SupportPage() {
                         placeholder="e.g. RA/123456"
                         className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm focus:outline-none focus:border-primary"
                       />
+                      <p className="mt-1 text-[11px] text-on-surface-variant">
+                        {soldierLookupStatus === "loading" && "Looking up soldier…"}
+                        {soldierLookupStatus === "found" && (
+                          <span className="text-primary">✓ Soldier found and details auto-filled.</span>
+                        )}
+                        {soldierLookupStatus === "not_found" && (
+                          <span className="text-error">No soldier matches this service number.</span>
+                        )}
+                        {soldierLookupStatus === "error" && (
+                          <span className="text-error">Lookup failed — try again.</span>
+                        )}
+                      </p>
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wider">
-                        Soldier's Rank
-                      </label>
-                      <input
-                        value={soldierRank}
-                        onChange={(e) => setSoldierRank(e.target.value)}
-                        placeholder="e.g. Sergeant"
-                        className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm focus:outline-none focus:border-primary"
-                      />
-                    </div>
+                    <ReadOnly label="Soldier's Full Name (auto)" value={soldierFullName || "—"} />
+                    <ReadOnly label="Soldier's Rank (auto)" value={soldierRank || "—"} />
                     <div className="md:col-span-2">
-                      <label className="block text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wider">
-                        Soldier's Service / Branch
-                      </label>
-                      <select
-                        value={soldierBranch}
-                        onChange={(e) => setSoldierBranch(e.target.value)}
-                        className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm focus:outline-none focus:border-primary"
-                      >
-                        <option value="">Select branch…</option>
-                        <option value="Land Force">Land Force</option>
-                        <option value="Air Force">Air Force</option>
-                        <option value="SFC">Special Forces (SFC)</option>
-                        <option value="Reserve Force">Reserve Force</option>
-                      </select>
+                      <ReadOnly label="Soldier's Service / Branch (auto)" value={soldierBranch || "—"} />
                     </div>
                   </div>
                 </>
