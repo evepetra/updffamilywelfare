@@ -102,6 +102,7 @@ function FamilyDashboard() {
           <ProfileDetailsCard
             userId={user?.id ?? ""}
             isSoldier={isSoldier}
+            email={user?.email}
             initial={profile}
             onSaved={() => qc.invalidateQueries({ queryKey: ["my-payout"] })}
           />
