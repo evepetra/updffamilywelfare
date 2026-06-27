@@ -785,9 +785,19 @@ function ProfileDetailsCard({
       {!editing ? (
         <dl className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <Field label="Full name" value={snapshot?.full_name || "—"} />
-          <Field label="UPDF Service" value={snapshot?.service || "Not assigned"} />
-          <Field label="Rank" value={snapshot?.rank || "—"} />
-          <Field label="Service / Army #" value={snapshot?.service_number || "—"} mono />
+          {isSoldier ? (
+            <>
+              <Field label="UPDF Service" value={snapshot?.service || "Not assigned"} />
+              <Field label="Rank" value={snapshot?.rank || "—"} />
+              <Field label="Service / Army #" value={snapshot?.service_number || "—"} mono />
+            </>
+          ) : (
+            <>
+              <Field label="Email" value={email || "—"} />
+              <Field label="NIN" value={snapshot?.nin || "—"} mono />
+              <Field label="Date for sign in" value={snapshot?.created_at ? new Date(snapshot.created_at).toLocaleDateString() : "—"} />
+            </>
+          )}
           <Field label="Region" value={snapshot?.region || "—"} />
         </dl>
       ) : (
