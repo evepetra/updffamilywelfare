@@ -558,6 +558,16 @@ function LoginPage() {
                 </div>
               )}
 
+              {signupNotice && (
+                <div
+                  role="status"
+                  className="text-sm text-primary bg-primary-fixed-dim/60 border border-primary/30 rounded-md px-3 py-2 flex gap-2"
+                >
+                  <Icon name="mark_email_read" className="text-[18px] mt-0.5" />
+                  <span>{signupNotice}</span>
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={loading}
