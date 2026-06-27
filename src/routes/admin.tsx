@@ -782,6 +782,48 @@ function AdminDashboard() {
                 Clear filters
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => {
+                const fromTs = ledgerFromDate ? new Date(ledgerFromDate + "T00:00:00").getTime() : null;
+                const toTs = ledgerToDate ? new Date(ledgerToDate + "T23:59:59").getTime() : null;
+                const rows = ledger.filter((l) => {
+                  if (ledgerStatusFilter !== "all" && l.status !== ledgerStatusFilter) return false;
+                  if (serviceFilter !== "all") {
+                    const svc = serviceByUserId.get(l.recipient_user_id) ?? "";
+                    if (svc !== serviceFilter) return false;
+                  }
+                  const d = new Date(l.disbursed_at ?? l.created_at).getTime();
+                  if (fromTs !== null && d < fromTs) return false;
+                  if (toTs !== null && d > toTs) return false;
+                  return true;
+                });
+                const csv = buildDisbursementsCsv(
+                  rows.map((l) => ({
+                    id: l.id,
+                    date: l.disbursed_at ?? l.created_at,
+                    recipient_name: l.recipient_name,
+                    region: l.region,
+                    service: serviceByUserId.get(l.recipient_user_id) ?? "",
+                    aid_type: l.aid_type,
+                    payout_method: l.payout_method,
+                    payout_provider: l.payout_provider,
+                    payout_account_name: l.payout_account_name,
+                    payout_account_number: l.payout_account_number,
+                    amount: l.amount,
+                    status: l.status,
+                  })),
+                );
+                const ts = new Date().toISOString().replace(/[:.]/g, "-");
+                downloadCsv(`disbursed-aid-${ts}.csv`, csv);
+              }}
+              disabled={ledger.length === 0}
+              title="Export filtered disbursements to CSV (includes UPDF Service)"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md border border-primary text-primary hover:bg-primary hover:text-on-primary disabled:opacity-40"
+            >
+              <Icon name="download" className="text-[14px]" />
+              Export CSV
+            </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
