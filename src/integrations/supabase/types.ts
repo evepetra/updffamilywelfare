@@ -26,6 +26,7 @@ export type Database = {
           payout_account_number: string | null
           payout_method: string | null
           payout_provider: string | null
+          reason: string | null
           recipient_name: string
           recipient_user_id: string
           region: string
@@ -44,6 +45,7 @@ export type Database = {
           payout_account_number?: string | null
           payout_method?: string | null
           payout_provider?: string | null
+          reason?: string | null
           recipient_name: string
           recipient_user_id: string
           region: string
@@ -62,6 +64,7 @@ export type Database = {
           payout_account_number?: string | null
           payout_method?: string | null
           payout_provider?: string | null
+          reason?: string | null
           recipient_name?: string
           recipient_user_id?: string
           region?: string
@@ -78,6 +81,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      aid_ledger_audit: {
+        Row: {
+          action: string
+          actor_id: string | null
+          amount: number | null
+          created_at: string
+          id: string
+          ledger_id: string
+          new_status: string | null
+          old_status: string | null
+          reason: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          amount?: number | null
+          created_at?: string
+          id?: string
+          ledger_id: string
+          new_status?: string | null
+          old_status?: string | null
+          reason?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          amount?: number | null
+          created_at?: string
+          id?: string
+          ledger_id?: string
+          new_status?: string | null
+          old_status?: string | null
+          reason?: string | null
+        }
+        Relationships: []
       }
       login_audit: {
         Row: {
@@ -208,6 +247,7 @@ export type Database = {
           id: string
           new_status: string
           old_status: string | null
+          reason: string | null
           request_id: string
         }
         Insert: {
@@ -216,6 +256,7 @@ export type Database = {
           id?: string
           new_status: string
           old_status?: string | null
+          reason?: string | null
           request_id: string
         }
         Update: {
@@ -224,6 +265,7 @@ export type Database = {
           id?: string
           new_status?: string
           old_status?: string | null
+          reason?: string | null
           request_id?: string
         }
         Relationships: [
@@ -267,6 +309,7 @@ export type Database = {
         Row: {
           amount_approved: number | null
           created_at: string
+          decision_reason: string | null
           details: string | null
           id: string
           request_type: string
@@ -279,6 +322,7 @@ export type Database = {
         Insert: {
           amount_approved?: number | null
           created_at?: string
+          decision_reason?: string | null
           details?: string | null
           id?: string
           request_type: string
@@ -291,6 +335,7 @@ export type Database = {
         Update: {
           amount_approved?: number | null
           created_at?: string
+          decision_reason?: string | null
           details?: string | null
           id?: string
           request_type?: string
