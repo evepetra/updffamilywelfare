@@ -5,6 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
 import { supabase } from "@/integrations/supabase/client";
 import { adminListUsers, requireAdmin } from "@/lib/auth/roles.functions";
+import { useAuth } from "@/hooks/use-auth";
 
 type AppRole = "family" | "soldier" | "officer" | "admin" | "system_admin";
 const ROLE_LABEL: Record<AppRole, string> = {
@@ -59,6 +60,10 @@ export const Route = createFileRoute("/admin-console")({
 
 function AdminConsole() {
   const qc = useQueryClient();
+  const auth = useAuth();
+  // System Administrators have oversight but cannot disburse aid — only
+  // Administrators move money out of the welfare account.
+  const canDisburse = auth.isAdmin;
   const [search, setSearch] = useState("");
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -413,14 +418,24 @@ function AdminConsole() {
                       )}
                     </td>
                     <td className="px-5 py-3 text-right">
-                      <button
-                        disabled={!hasAcc || disbursingId === row.id}
-                        onClick={() => disburse(row)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded bg-primary text-on-primary hover:bg-primary-container disabled:opacity-40"
-                      >
-                        <Icon name="send_money" className="text-[14px]" />
-                        {disbursingId === row.id ? "Disbursing…" : "Disburse"}
-                      </button>
+                      {canDisburse ? (
+                        <button
+                          disabled={!hasAcc || disbursingId === row.id}
+                          onClick={() => disburse(row)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded bg-primary text-on-primary hover:bg-primary-container disabled:opacity-40"
+                        >
+                          <Icon name="send_money" className="text-[14px]" />
+                          {disbursingId === row.id ? "Disbursing…" : "Disburse"}
+                        </button>
+                      ) : (
+                        <span
+                          title="System Administrators have oversight only; disbursals are performed by Administrators."
+                          className="inline-flex items-center gap-1 text-xs text-on-surface-variant"
+                        >
+                          <Icon name="visibility" className="text-[14px]" />
+                          View only
+                        </span>
+                      )}
                     </td>
                   </tr>
                 );
