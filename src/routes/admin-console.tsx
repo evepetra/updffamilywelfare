@@ -581,8 +581,23 @@ function AdminConsole() {
                       }}
                     />
                   </th>
-                  <th className="text-left px-5 py-3 font-medium">User</th>
+                  <th className="text-left px-5 py-3 font-medium">
+                    <button onClick={() => toggleSort("full_name")} className="inline-flex items-center gap-1 hover:text-primary uppercase tracking-wider">
+                      User
+                      {sortBy === "full_name" && (
+                        <Icon name={sortDir === "asc" ? "arrow_upward" : "arrow_downward"} className="text-[12px]" />
+                      )}
+                    </button>
+                  </th>
                   <th className="text-left px-5 py-3 font-medium">Email</th>
+                  <th className="text-left px-5 py-3 font-medium">
+                    <button onClick={() => toggleSort("service")} className="inline-flex items-center gap-1 hover:text-primary uppercase tracking-wider">
+                      UPDF Service
+                      {sortBy === "service" && (
+                        <Icon name={sortDir === "asc" ? "arrow_upward" : "arrow_downward"} className="text-[12px]" />
+                      )}
+                    </button>
+                  </th>
                   <th className="text-center px-3 py-3 font-medium">Sys Admin</th>
                   <th className="text-center px-3 py-3 font-medium">Admin</th>
                   <th className="text-center px-3 py-3 font-medium">Officer</th>
@@ -592,15 +607,15 @@ function AdminConsole() {
               </thead>
               <tbody className="divide-y divide-outline-variant">
                 {usersQuery.isLoading && (
-                  <tr><td colSpan={8} className="text-center py-8 text-on-surface-variant">Loading users…</td></tr>
+                  <tr><td colSpan={9} className="text-center py-8 text-on-surface-variant">Loading users…</td></tr>
                 )}
                 {usersQuery.error && !usersQuery.isLoading && (
-                  <tr><td colSpan={8} className="text-center py-8 text-error">
+                  <tr><td colSpan={9} className="text-center py-8 text-error">
                     {(usersQuery.error as Error).message}
                   </td></tr>
                 )}
                 {!usersQuery.isLoading && filtered.length === 0 && (
-                  <tr><td colSpan={8} className="text-center py-8 text-on-surface-variant">No users match.</td></tr>
+                  <tr><td colSpan={9} className="text-center py-8 text-on-surface-variant">No users match.</td></tr>
                 )}
                 {filtered.map((u) => {
                   const userRoles = u.roles ?? [];
@@ -621,6 +636,16 @@ function AdminConsole() {
                         </p>
                       </td>
                       <td className="px-5 py-3 text-on-surface-variant">{u.email}</td>
+                      <td className="px-5 py-3 text-xs">
+                        {u.service ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-fixed-dim text-primary font-medium">
+                            <Icon name="military_tech" className="text-[12px]" />
+                            {u.service}
+                          </span>
+                        ) : (
+                          <span className="text-on-surface-variant">—</span>
+                        )}
+                      </td>
                       {(["system_admin", "admin", "officer", "soldier", "family"] as AppRole[]).map((role) => {
                         const has = userRoles.includes(role);
                         const key = `${u.id}:${role}`;
