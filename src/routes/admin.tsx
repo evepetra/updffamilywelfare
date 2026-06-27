@@ -764,7 +764,7 @@ function AdminDashboard() {
                 ))}
               </select>
             </label>
-            {(ledgerFromDate || ledgerToDate || ledgerStatusFilter !== "all") && (
+            {(ledgerFromDate || ledgerToDate || ledgerStatusFilter !== "all" || serviceFilter !== "all") && (
               <button
                 onClick={() => {
                   setLedgerFromDate("");
