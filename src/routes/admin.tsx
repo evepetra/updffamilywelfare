@@ -718,13 +718,14 @@ function AdminDashboard() {
                   <th className="text-left px-5 py-3 font-medium">Recipient</th>
                   <th className="text-left px-5 py-3 font-medium">Region</th>
                   <th className="text-left px-5 py-3 font-medium">Aid Type</th>
+                  <th className="text-left px-5 py-3 font-medium">Deposit Account</th>
                   <th className="text-right px-5 py-3 font-medium">Amount (UGX)</th>
                   <th className="text-left px-5 py-3 font-medium">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant">
                 {ledgerQuery.isLoading && (
-                  <tr><td colSpan={6} className="text-center py-8 text-on-surface-variant text-sm">Loading…</td></tr>
+                  <tr><td colSpan={7} className="text-center py-8 text-on-surface-variant text-sm">Loading…</td></tr>
                 )}
                 {(() => {
                   const fromTs = ledgerFromDate ? new Date(ledgerFromDate + "T00:00:00").getTime() : null;
@@ -738,7 +739,7 @@ function AdminDashboard() {
                   });
                   if (!ledgerQuery.isLoading && filtered.length === 0) {
                     return (
-                      <tr><td colSpan={6} className="text-center py-8 text-on-surface-variant text-sm">No disbursals match the current filters.</td></tr>
+                      <tr><td colSpan={7} className="text-center py-8 text-on-surface-variant text-sm">No disbursals match the current filters.</td></tr>
                     );
                   }
                   return filtered.slice(0, 50).map((l) => (
@@ -749,6 +750,19 @@ function AdminDashboard() {
                     <td className="px-5 py-3 font-medium">{l.recipient_name}</td>
                     <td className="px-5 py-3">{l.region}</td>
                     <td className="px-5 py-3">{l.aid_type}</td>
+                    <td className="px-5 py-3 text-xs">
+                      {l.payout_account_number ? (
+                        <>
+                          <div className="font-medium capitalize">
+                            {(l.payout_method === "mobile_money" ? "Mobile Money" : "Bank")}
+                            {l.payout_provider ? ` · ${l.payout_provider}` : ""}
+                          </div>
+                          <div className="font-mono text-on-surface-variant">{l.payout_account_number}</div>
+                        </>
+                      ) : (
+                        <span className="text-on-surface-variant">—</span>
+                      )}
+                    </td>
                     <td className="px-5 py-3 text-right font-mono">
                       {Number(l.amount || 0).toLocaleString("en-UG")}
                     </td>
