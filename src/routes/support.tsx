@@ -430,7 +430,7 @@ function SupportPage() {
           {step === 2 && (
             <>
               <h2 className="text-xl font-semibold text-primary mb-1">
-                {beneficiary === "self" ? "Soldier Profile" : "My Profile & Soldier Relationship"}
+                {beneficiary === "self" ? "Soldier Profile" : "Family Member & Soldier Relationship"}
               </h2>
               <p className="text-sm text-on-surface-variant mb-6">
                 {beneficiary === "self"
@@ -497,24 +497,6 @@ function SupportPage() {
                         className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm focus:outline-none focus:border-primary"
                       />
                     </div>
-                  </div>
-
-                  <h3 className="text-sm font-semibold text-on-surface mb-3">My Profile</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <ReadOnly label="Full Name" value={profile?.full_name || "—"} />
-                    <ReadOnly label="Email" value={user?.email || "—"} />
-                    <div>
-                      <label className="block text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wider">
-                        Contact Information
-                      </label>
-                      <input
-                        value={contactInfo}
-                        onChange={(e) => setContactInfo(e.target.value)}
-                        placeholder="Phone or alternate contact"
-                        className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                    <ReadOnly label="National ID (NIN)" value={profile?.nin || "—"} />
                   </div>
 
                   <h3 className="text-sm font-semibold text-on-surface mb-3">Soldier Relationship Details</h3>
