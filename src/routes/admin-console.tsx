@@ -20,6 +20,7 @@ type AdminUserRow = {
   email: string | null;
   full_name: string | null;
   service_number: string | null;
+  service: string | null;
   roles: AppRole[] | null;
   created_at: string;
 };
@@ -68,6 +69,9 @@ function AdminConsole() {
   const disburseLockTooltip =
     "Locked for System Administrators. Only Administrators can release funds; system_admin disbursal writes are blocked at the database level (RLS).";
   const [search, setSearch] = useState("");
+  const [serviceFilter, setServiceFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"created_at" | "service" | "full_name">("created_at");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -96,6 +100,7 @@ function AdminConsole() {
     profiles: {
       full_name: string | null;
       service_number: string | null;
+      service: string | null;
       payout_method: string | null;
       payout_provider: string | null;
       payout_account_name: string | null;
@@ -116,12 +121,13 @@ function AdminConsole() {
       if (userIds.length) {
         const { data: profs, error: pErr } = await supabase
           .from("profiles")
-          .select("id, full_name, service_number, payout_method, payout_provider, payout_account_name, payout_account_number")
+          .select("id, full_name, service_number, service, payout_method, payout_provider, payout_account_name, payout_account_number")
           .in("id", userIds);
         if (pErr) throw pErr;
         profilesById = new Map((profs ?? []).map((p) => [p.id, {
           full_name: p.full_name,
           service_number: p.service_number,
+          service: p.service,
           payout_method: p.payout_method,
           payout_provider: p.payout_provider,
           payout_account_name: p.payout_account_name,
