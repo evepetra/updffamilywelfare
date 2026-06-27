@@ -77,9 +77,9 @@ function LedgerPage() {
   const total = rows.reduce((acc, r) => acc + Number(r.amount || 0), 0);
 
   function exportCsv() {
-    const header = ["id", "recipient", "type", "region", "date", "amount", "status"];
+    const header = ["id", "recipient", "type", "region", "deposit_method", "deposit_provider", "deposit_account_name", "deposit_account_number", "date", "amount", "status"];
     const lines = rows.map((r) =>
-      [r.id, r.recipient_name, r.aid_type, r.region, r.created_at, r.amount, r.status]
+      [r.id, r.recipient_name, r.aid_type, r.region, r.payout_method, r.payout_provider, r.payout_account_name, r.payout_account_number, r.created_at, r.amount, r.status]
         .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`)
         .join(","),
     );
