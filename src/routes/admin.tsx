@@ -845,6 +845,10 @@ function RecordDisbursalDialog({
   const [aidType, setAidType] = useState("Medical");
   const [amount, setAmount] = useState("");
   const [status, setStatus] = useState("disbursed");
+  const [payoutMethod, setPayoutMethod] = useState<"mobile_money" | "bank">("mobile_money");
+  const [payoutProvider, setPayoutProvider] = useState("MTN");
+  const [payoutAccountName, setPayoutAccountName] = useState("");
+  const [payoutAccountNumber, setPayoutAccountNumber] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -859,6 +863,10 @@ function RecordDisbursalDialog({
       amount: Number(amount) || 0,
       status,
       disbursed_at: status === "disbursed" ? new Date().toISOString() : null,
+      payout_method: payoutMethod,
+      payout_provider: payoutProvider.trim() || null,
+      payout_account_name: payoutAccountName.trim() || null,
+      payout_account_number: payoutAccountNumber.trim() || null,
     });
     setBusy(false);
     if (error) {
@@ -918,6 +926,37 @@ function RecordDisbursalDialog({
             <option value="approved">Approved</option>
             <option value="disbursed">Disbursed</option>
           </select>
+          <div className="pt-2 border-t border-outline-variant">
+            <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2">Deposit account</p>
+            <div className="grid grid-cols-2 gap-3">
+              <select
+                value={payoutMethod}
+                onChange={(e) => setPayoutMethod(e.target.value as "mobile_money" | "bank")}
+                className="px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+              >
+                <option value="mobile_money">Mobile Money</option>
+                <option value="bank">Bank</option>
+              </select>
+              <input
+                value={payoutProvider}
+                onChange={(e) => setPayoutProvider(e.target.value)}
+                placeholder={payoutMethod === "mobile_money" ? "Provider (MTN, Airtel…)" : "Bank name"}
+                className="px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+              />
+            </div>
+            <input
+              value={payoutAccountName}
+              onChange={(e) => setPayoutAccountName(e.target.value)}
+              placeholder="Account holder name"
+              className="mt-3 w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+            />
+            <input
+              value={payoutAccountNumber}
+              onChange={(e) => setPayoutAccountNumber(e.target.value)}
+              placeholder={payoutMethod === "mobile_money" ? "Phone / wallet number (e.g. 0772123456)" : "Bank account number"}
+              className="mt-3 w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm font-mono"
+            />
+          </div>
           {err && <p className="text-sm text-error">{err}</p>}
         </div>
         <div className="flex justify-end gap-2 mt-6">
@@ -925,7 +964,7 @@ function RecordDisbursalDialog({
             Cancel
           </button>
           <button
-            disabled={busy || !recipientName || !recipientUserId || !amount}
+            disabled={busy || !recipientName || !recipientUserId || !amount || !payoutAccountNumber}
             onClick={save}
             className="px-5 py-2.5 text-sm font-semibold bg-primary text-on-primary rounded-md hover:bg-primary-container disabled:opacity-50"
           >
