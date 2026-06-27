@@ -97,6 +97,7 @@ const baseSignUpSchema = signInSchema.extend({
     .string()
     .trim()
     .toUpperCase()
+    .max(14, { message: "NIN cannot exceed 14 characters" })
     .regex(NIN_REGEX, {
       message: "Enter a valid 14-character National ID (e.g. CM12345678ABCD)",
     }),
@@ -476,12 +477,20 @@ function LoginPage() {
                     <input
                       type="text"
                       required
-                      maxLength={14}
+                      maxLength={20}
                       placeholder="CM12345678ABCD"
                       pattern="^[Cc][MmFf][A-Za-z0-9]{12}$"
                       title="14 characters, starting with CM or CF"
                       value={nin}
-                      onChange={(e) => setNin(e.target.value.toUpperCase())}
+                      onChange={(e) => {
+                        const v = e.target.value.toUpperCase();
+                        setNin(v);
+                        if (v.length > 14) {
+                          setFieldErrors((fe) => ({ ...fe, nin: "NIN cannot exceed 14 characters" }));
+                        } else if (fieldErrors.nin === "NIN cannot exceed 14 characters") {
+                          setFieldErrors((fe) => ({ ...fe, nin: undefined }));
+                        }
+                      }}
                       aria-invalid={!!fieldErrors.nin}
                       className={
                         "w-full px-4 py-3 bg-surface-container-low border rounded-md focus:outline-none text-sm font-mono uppercase " +

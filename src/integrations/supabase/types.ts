@@ -167,6 +167,11 @@ export type Database = {
           payout_provider: string | null
           rank: string | null
           region: string | null
+          related_soldier_full_name: string | null
+          related_soldier_rank: string | null
+          related_soldier_service: string | null
+          related_soldier_service_number: string | null
+          relationship_to_soldier: string | null
           service: string | null
           service_number: string | null
           updated_at: string
@@ -183,6 +188,11 @@ export type Database = {
           payout_provider?: string | null
           rank?: string | null
           region?: string | null
+          related_soldier_full_name?: string | null
+          related_soldier_rank?: string | null
+          related_soldier_service?: string | null
+          related_soldier_service_number?: string | null
+          relationship_to_soldier?: string | null
           service?: string | null
           service_number?: string | null
           updated_at?: string
@@ -199,6 +209,11 @@ export type Database = {
           payout_provider?: string | null
           rank?: string | null
           region?: string | null
+          related_soldier_full_name?: string | null
+          related_soldier_rank?: string | null
+          related_soldier_service?: string | null
+          related_soldier_service_number?: string | null
+          relationship_to_soldier?: string | null
           service?: string | null
           service_number?: string | null
           updated_at?: string
@@ -318,7 +333,9 @@ export type Database = {
           decision_reason: string | null
           details: string | null
           id: string
+          payment_method: string | null
           request_type: string
+          requested_amount: number | null
           status: string
           title: string
           updated_at: string
@@ -331,7 +348,9 @@ export type Database = {
           decision_reason?: string | null
           details?: string | null
           id?: string
+          payment_method?: string | null
           request_type: string
+          requested_amount?: number | null
           status?: string
           title: string
           updated_at?: string
@@ -344,7 +363,9 @@ export type Database = {
           decision_reason?: string | null
           details?: string | null
           id?: string
+          payment_method?: string | null
           request_type?: string
+          requested_amount?: number | null
           status?: string
           title?: string
           updated_at?: string

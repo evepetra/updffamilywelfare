@@ -30,9 +30,12 @@ export const Route = createFileRoute("/support")({
 const STEPS = [
   { label: "Request Type", icon: "category" },
   { label: "Family Details", icon: "family_restroom" },
+  { label: "Financial Aid", icon: "payments" },
   { label: "Documents", icon: "upload_file" },
   { label: "Review & Submit", icon: "task_alt" },
 ];
+
+const MOBILE_MONEY_MAX_UGX = 7_000_000;
 
 function SupportPage() {
   const navigate = useNavigate();
@@ -43,6 +46,9 @@ function SupportPage() {
   const [notify, setNotify] = useState({ sms: true, email: true, app: true });
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
+  const [requestedAmount, setRequestedAmount] = useState<string>("");
+  const [paymentMethod, setPaymentMethod] = useState<"mobile_money" | "bank_transfer">("mobile_money");
+  const [amountError, setAmountError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
@@ -86,6 +92,15 @@ function SupportPage() {
 
   async function submit() {
     if (!user) return;
+    const amt = requestedAmount ? Number(requestedAmount) : null;
+    if (amt !== null && (!Number.isFinite(amt) || amt < 0)) {
+      setError("Enter a valid requested amount in UGX.");
+      return;
+    }
+    if (paymentMethod === "mobile_money" && amt !== null && amt > MOBILE_MONEY_MAX_UGX) {
+      setError("Maximum request amount for Mobile Money transfers is 7,000,000 UGX.");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     const { data: inserted, error: insertErr } = await supabase
@@ -97,6 +112,8 @@ function SupportPage() {
       title: title.trim() || `${requestType} request`,
       details: details.trim() || null,
       status: "pending",
+      requested_amount: amt,
+      payment_method: paymentMethod,
       })
       .select("id")
       .single();
@@ -148,6 +165,7 @@ function SupportPage() {
   }
 
   function next() {
+    if (step === 2 && amountError) return;
     if (step < STEPS.length - 1) setStep(step + 1);
     else void submit();
   }
@@ -309,6 +327,79 @@ function SupportPage() {
 
           {step === 2 && (
             <>
+              <h2 className="text-xl font-semibold text-primary mb-1">Financial Aid Request</h2>
+              <p className="text-sm text-on-surface-variant mb-6">
+                Specify the amount you are requesting and how it should be paid out.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-on-surface mb-1.5">
+                    Requested Amount (UGX)
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    step={1000}
+                    value={requestedAmount}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setRequestedAmount(v);
+                      const n = v === "" ? null : Number(v);
+                      if (n !== null && paymentMethod === "mobile_money" && n > MOBILE_MONEY_MAX_UGX) {
+                        setAmountError("Maximum request amount for Mobile Money transfers is 7,000,000 UGX.");
+                      } else {
+                        setAmountError(null);
+                      }
+                    }}
+                    placeholder="e.g. 500000"
+                    aria-invalid={!!amountError}
+                    className={
+                      "w-full px-4 py-3 bg-surface-container-low border rounded-md focus:outline-none text-sm " +
+                      (amountError ? "border-error focus:border-error" : "border-outline-variant focus:border-primary")
+                    }
+                  />
+                  {amountError ? (
+                    <p className="mt-1.5 text-xs text-error">{amountError}</p>
+                  ) : (
+                    requestedAmount && (
+                      <p className="mt-1.5 text-xs text-on-surface-variant">
+                        {Number(requestedAmount).toLocaleString("en-UG")} UGX
+                      </p>
+                    )
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-on-surface mb-1.5">
+                    Payment Method
+                  </label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => {
+                      const v = e.target.value as "mobile_money" | "bank_transfer";
+                      setPaymentMethod(v);
+                      const n = requestedAmount ? Number(requestedAmount) : null;
+                      if (v === "mobile_money" && n !== null && n > MOBILE_MONEY_MAX_UGX) {
+                        setAmountError("Maximum request amount for Mobile Money transfers is 7,000,000 UGX.");
+                      } else {
+                        setAmountError(null);
+                      }
+                    }}
+                    className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary text-sm"
+                  >
+                    <option value="mobile_money">Mobile Money</option>
+                    <option value="bank_transfer">Bank Transfer</option>
+                  </select>
+                  <p className="mt-1.5 text-xs text-on-surface-variant">
+                    Mobile Money payouts are limited to 7,000,000 UGX per request.
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
+
+          {step === 3 && (
+            <>
               <h2 className="text-xl font-semibold text-primary mb-1">
                 Supporting Documents
               </h2>
@@ -374,7 +465,7 @@ function SupportPage() {
             </>
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <>
               <h2 className="text-xl font-semibold text-primary mb-1">
                 Review & Submit
@@ -387,6 +478,14 @@ function SupportPage() {
                 <Summary label="Urgency" value={urgency} />
                 <Summary label="Family Head" value={profile?.full_name || "—"} />
                 <Summary label="Title" value={title || `${requestType} request`} />
+                <Summary
+                  label="Requested Amount"
+                  value={requestedAmount ? `${Number(requestedAmount).toLocaleString("en-UG")} UGX` : "—"}
+                />
+                <Summary
+                  label="Payment Method"
+                  value={paymentMethod === "mobile_money" ? "Mobile Money" : "Bank Transfer"}
+                />
               </div>
               <h3 className="text-sm font-medium mb-3">Notification Preferences</h3>
               <div className="space-y-2 mb-4">
