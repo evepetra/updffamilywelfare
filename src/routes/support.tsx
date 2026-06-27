@@ -29,13 +29,17 @@ export const Route = createFileRoute("/support")({
 
 const STEPS = [
   { label: "Request Type", icon: "category" },
-  { label: "Family Details", icon: "family_restroom" },
+  { label: "Beneficiary", icon: "groups" },
+  { label: "Profile Details", icon: "badge" },
   { label: "Enter Amount", icon: "payments" },
   { label: "Documents", icon: "upload_file" },
   { label: "Review & Submit", icon: "task_alt" },
 ];
 
 const MOBILE_MONEY_MAX_UGX = 7_000_000;
+
+const PRIMARY_RELATIONSHIPS = ["Father", "Mother", "Wife", "Husband", "Son", "Daughter"];
+const EXTENDED_RELATIONSHIPS = ["Brother", "Sister", "Aunt", "Uncle", "Cousin", "Other"];
 
 function SupportPage() {
   const navigate = useNavigate();
@@ -53,6 +57,19 @@ function SupportPage() {
   const [error, setError] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Beneficiary path. Soldiers default to "self"; family users are locked to "family".
+  const [beneficiary, setBeneficiary] = useState<"self" | "family">(
+    isSoldier ? "self" : "family",
+  );
+
+  // Soldier-relationship fields (used when beneficiary === "family").
+  const [relationship, setRelationship] = useState<string>("");
+  const [soldierFullName, setSoldierFullName] = useState<string>("");
+  const [soldierServiceNumber, setSoldierServiceNumber] = useState<string>("");
+  const [soldierRank, setSoldierRank] = useState<string>("");
+  const [soldierBranch, setSoldierBranch] = useState<string>("");
+  const [contactInfo, setContactInfo] = useState<string>("");
 
   function addFiles(list: FileList | null) {
     if (!list) return;
@@ -101,8 +118,21 @@ function SupportPage() {
       setError("Maximum request amount for Mobile Money transfers is 7,000,000 UGX.");
       return;
     }
+    if (beneficiary === "family") {
+      if (!relationship || !soldierFullName.trim() || !soldierServiceNumber.trim()) {
+        setError("Provide your relationship and the soldier's full name and service number.");
+        return;
+      }
+    }
     setSubmitting(true);
     setError(null);
+    const beneficiaryHeader =
+      beneficiary === "self"
+        ? "[Beneficiary: Self]"
+        : `[Beneficiary: Family — ${relationship} of ${soldierFullName} (${soldierServiceNumber}${
+            soldierRank ? `, ${soldierRank}` : ""
+          }${soldierBranch ? `, ${soldierBranch}` : ""})]`;
+    const composedDetails = [beneficiaryHeader, details.trim()].filter(Boolean).join("\n\n");
     const { data: inserted, error: insertErr } = await supabase
       .from("support_requests")
       .insert({
@@ -110,7 +140,7 @@ function SupportPage() {
       request_type: requestType,
       urgency: urgency.toLowerCase(),
       title: title.trim() || `${requestType} request`,
-      details: details.trim() || null,
+      details: composedDetails || null,
       status: "pending",
       requested_amount: amt,
       payment_method: paymentMethod,
@@ -165,7 +195,7 @@ function SupportPage() {
   }
 
   function next() {
-    if (step === 2 && amountError) return;
+    if (step === 3 && amountError) return;
     if (step < STEPS.length - 1) setStep(step + 1);
     else void submit();
   }
@@ -289,25 +319,177 @@ function SupportPage() {
 
           {step === 1 && (
             <>
-              <h2 className="text-xl font-semibold text-primary mb-1">Family Details</h2>
+              <h2 className="text-xl font-semibold text-primary mb-1">Who is this aid for?</h2>
               <p className="text-sm text-on-surface-variant mb-6">
-                Confirm your household information.
+                Choose whether you are requesting aid for yourself or on behalf of a registered family member.
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <ReadOnly label="Family Head" value={profile?.full_name || "—"} />
-                {isSoldier ? (
-                  <>
-                    <ReadOnly label="Service Number" value={profile?.service_number || "—"} />
-                    <ReadOnly label="Account Email" value={user?.email || "—"} />
-                    <ReadOnly label="Account ID" value={(user?.id || "").slice(0, 8).toUpperCase()} />
-                  </>
-                ) : (
-                  <>
-                    <ReadOnly label="Email" value={user?.email || "—"} />
-                    <ReadOnly label="National ID (NIN)" value={profile?.nin || "—"} />
-                  </>
-                )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {(
+                  [
+                    {
+                      key: "self" as const,
+                      title: "Request Aid for Myself",
+                      desc: "For the soldier directly.",
+                      icon: "military_tech",
+                      disabled: !isSoldier,
+                    },
+                    {
+                      key: "family" as const,
+                      title: "Request Aid for a Family Member",
+                      desc: "For a registered dependent.",
+                      icon: "family_restroom",
+                      disabled: false,
+                    },
+                  ]
+                ).map((opt) => {
+                  const active = beneficiary === opt.key;
+                  return (
+                    <button
+                      key={opt.key}
+                      disabled={opt.disabled}
+                      onClick={() => setBeneficiary(opt.key)}
+                      className={
+                        "flex items-start gap-4 p-4 rounded-md border-2 text-left transition-colors " +
+                        (active
+                          ? "border-primary bg-primary-fixed-dim/40"
+                          : "border-outline-variant hover:border-primary/40") +
+                        (opt.disabled ? " opacity-40 cursor-not-allowed" : "")
+                      }
+                    >
+                      <div className="w-10 h-10 rounded-md bg-primary text-on-primary flex items-center justify-center shrink-0">
+                        <Icon name={opt.icon} className="text-[20px]" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm">{opt.title}</p>
+                        <p className="text-xs text-on-surface-variant mt-0.5">{opt.desc}</p>
+                        {opt.disabled && (
+                          <p className="text-[11px] text-on-surface-variant mt-1 italic">
+                            Only soldier accounts may request aid for themselves.
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
+            </>
+          )}
+
+          {step === 2 && (
+            <>
+              <h2 className="text-xl font-semibold text-primary mb-1">
+                {beneficiary === "self" ? "Soldier Profile" : "My Profile & Soldier Relationship"}
+              </h2>
+              <p className="text-sm text-on-surface-variant mb-6">
+                {beneficiary === "self"
+                  ? "Confirm your service details."
+                  : "Confirm your details and the soldier you are related to."}
+              </p>
+
+              {beneficiary === "self" ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <ReadOnly label="Full Name" value={profile?.full_name || "—"} />
+                  <ReadOnly label="Service Number" value={profile?.service_number || "—"} />
+                  <ReadOnly label="Rank" value={profile?.rank || "—"} />
+                  <ReadOnly label="Service / Branch" value={profile?.service || "—"} />
+                </div>
+              ) : (
+                <>
+                  <h3 className="text-sm font-semibold text-on-surface mb-3">My Profile</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <ReadOnly label="Full Name" value={profile?.full_name || "—"} />
+                    <ReadOnly label="Email" value={user?.email || "—"} />
+                    <div>
+                      <label className="block text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wider">
+                        Contact Information
+                      </label>
+                      <input
+                        value={contactInfo}
+                        onChange={(e) => setContactInfo(e.target.value)}
+                        placeholder="Phone or alternate contact"
+                        className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <ReadOnly label="National ID (NIN)" value={profile?.nin || "—"} />
+                  </div>
+
+                  <h3 className="text-sm font-semibold text-on-surface mb-3">Soldier Relationship Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wider">
+                        Relationship to Soldier
+                      </label>
+                      <select
+                        value={relationship}
+                        onChange={(e) => setRelationship(e.target.value)}
+                        className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm focus:outline-none focus:border-primary"
+                      >
+                        <option value="">Select relationship…</option>
+                        <optgroup label="Primary">
+                          {PRIMARY_RELATIONSHIPS.map((r) => (
+                            <option key={r} value={r}>{r}</option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Extended / Adopted">
+                          {EXTENDED_RELATIONSHIPS.map((r) => (
+                            <option key={r} value={r}>{r}</option>
+                          ))}
+                        </optgroup>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wider">
+                        Soldier's Full Name
+                      </label>
+                      <input
+                        value={soldierFullName}
+                        onChange={(e) => setSoldierFullName(e.target.value)}
+                        placeholder="e.g. John Doe"
+                        className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wider">
+                        Soldier's Service Number
+                      </label>
+                      <input
+                        value={soldierServiceNumber}
+                        onChange={(e) => setSoldierServiceNumber(e.target.value.toUpperCase())}
+                        placeholder="e.g. RA/123456"
+                        className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wider">
+                        Soldier's Rank
+                      </label>
+                      <input
+                        value={soldierRank}
+                        onChange={(e) => setSoldierRank(e.target.value)}
+                        placeholder="e.g. Sergeant"
+                        className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wider">
+                        Soldier's Service / Branch
+                      </label>
+                      <select
+                        value={soldierBranch}
+                        onChange={(e) => setSoldierBranch(e.target.value)}
+                        className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm focus:outline-none focus:border-primary"
+                      >
+                        <option value="">Select branch…</option>
+                        <option value="Land Force">Land Force</option>
+                        <option value="Air Force">Air Force</option>
+                        <option value="SFC">Special Forces (SFC)</option>
+                        <option value="Reserve Force">Reserve Force</option>
+                      </select>
+                    </div>
+                  </div>
+                </>
+              )}
+
               <div className="mt-6">
                 <label className="block text-sm font-medium text-on-surface mb-1.5">
                   Request Title
@@ -334,7 +516,7 @@ function SupportPage() {
             </>
           )}
 
-          {step === 2 && (
+          {step === 3 && (
             <>
               <h2 className="text-xl font-semibold text-primary mb-1">Financial Aid Request</h2>
               <p className="text-sm text-on-surface-variant mb-6">
@@ -407,7 +589,7 @@ function SupportPage() {
             </>
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <>
               <h2 className="text-xl font-semibold text-primary mb-1">
                 Supporting Documents
@@ -474,7 +656,7 @@ function SupportPage() {
             </>
           )}
 
-          {step === 4 && (
+          {step === 5 && (
             <>
               <h2 className="text-xl font-semibold text-primary mb-1">
                 Review & Submit
@@ -485,7 +667,20 @@ function SupportPage() {
               <div className="grid grid-cols-2 gap-3 mb-6">
                 <Summary label="Type" value={requestType} />
                 <Summary label="Urgency" value={urgency} />
-                <Summary label="Family Head" value={profile?.full_name || "—"} />
+                <Summary
+                  label="Beneficiary"
+                  value={beneficiary === "self" ? "Self (Soldier)" : `Family — ${relationship || "—"}`}
+                />
+                {beneficiary === "family" && (
+                  <Summary
+                    label="Soldier"
+                    value={
+                      soldierFullName
+                        ? `${soldierFullName}${soldierServiceNumber ? ` (${soldierServiceNumber})` : ""}`
+                        : "—"
+                    }
+                  />
+                )}
                 <Summary label="Title" value={title || `${requestType} request`} />
                 <Summary
                   label="Requested Amount"
