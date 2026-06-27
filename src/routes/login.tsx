@@ -212,6 +212,8 @@ function LoginPage() {
           );
           setLastSignupEmail(parsed.data.email);
           setResendMsg(null);
+          setResendCount(0);
+          setResendCooldown(0);
           setMode("signin");
         }
       } else {
