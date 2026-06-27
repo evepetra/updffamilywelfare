@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
 import { supabase } from "@/integrations/supabase/client";
@@ -671,6 +672,24 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
   );
 }
 
+function LockedField({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div
+      className="rounded-md bg-surface-container-low/60 border border-outline-variant/50 px-3 py-2 opacity-90"
+      title="Read-only — cannot be changed from your dashboard"
+      aria-readonly="true"
+    >
+      <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-outline font-medium">
+        <Icon name="lock" className="text-[12px]" />
+        <span>{label}</span>
+      </div>
+      <div className={"mt-0.5 text-on-surface-variant select-text " + (mono ? "font-mono text-sm" : "text-sm")}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
 type ProfileInfo = {
   full_name: string | null;
   service_number: string | null;
@@ -714,6 +733,7 @@ function ProfileDetailsCard({
   const [snapshot, setSnapshot] = useState<ProfileInfo>(initial);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [regionErr, setRegionErr] = useState<string | null>(null);
 
   useEffect(() => {
     setSnapshot(initial);
@@ -725,17 +745,35 @@ function ProfileDetailsCard({
 
   async function save() {
     if (!userId) return;
+    const trimmedRegion = region.trim();
+    if (!trimmedRegion) {
+      setRegionErr("Region is required.");
+      return;
+    }
+    if (!REGIONS.includes(trimmedRegion)) {
+      setRegionErr("Choose a valid region: Central, Western, Northern, Eastern, or West Nile.");
+      return;
+    }
+    setRegionErr(null);
     setBusy(true);
     setErr(null);
-    const payload = {
-      full_name: fullName.trim() || null,
-      region: region.trim() || null,
-      ...(isSoldier ? { rank: rank.trim() || null, service: service.trim() || null } : {}),
-    };
+    const payload = isSoldier
+      ? {
+          full_name: fullName.trim() || null,
+          region: trimmedRegion,
+          rank: rank.trim() || null,
+          service: service.trim() || null,
+        }
+      : {
+          // Family members may only update full_name and region.
+          full_name: fullName.trim() || null,
+          region: trimmedRegion,
+        };
     const { error } = await supabase.from("profiles").update(payload).eq("id", userId);
     setBusy(false);
     if (error) {
       setErr(error.message);
+      toast.error("Could not save profile", { description: error.message });
       return;
     }
     setSnapshot({
@@ -743,11 +781,12 @@ function ProfileDetailsCard({
       service_number: snapshot?.service_number ?? null,
       service: isSoldier ? service.trim() || null : snapshot?.service ?? null,
       rank: (isSoldier ? payload.rank : snapshot?.rank) ?? null,
-      region: payload.region,
+      region: trimmedRegion,
       nin: snapshot?.nin ?? null,
       created_at: snapshot?.created_at ?? null,
     });
     setEditing(false);
+    toast.success("Profile updated");
     onSaved();
   }
 
@@ -788,19 +827,32 @@ function ProfileDetailsCard({
             <>
               <Field label="UPDF Service" value={snapshot?.service || "Not assigned"} />
               <Field label="Rank" value={snapshot?.rank || "—"} />
-              <Field label="Service / Army #" value={snapshot?.service_number || "—"} mono />
+              <Field label="Army number" value={snapshot?.service_number || "—"} mono />
             </>
           ) : (
             <>
-              <Field label="Email" value={email || "—"} />
-              <Field label="NIN" value={snapshot?.nin || "—"} mono />
-              <Field label="Date for sign in" value={snapshot?.created_at ? new Date(snapshot.created_at).toLocaleDateString() : "—"} />
+              <LockedField label="Email" value={email || "—"} />
+              <LockedField label="NIN" value={snapshot?.nin || "—"} mono />
+              <LockedField
+                label="Date for sign in"
+                value={snapshot?.created_at ? new Date(snapshot.created_at).toLocaleDateString() : "—"}
+              />
             </>
           )}
           <Field label="Region" value={snapshot?.region || "—"} />
         </dl>
       ) : (
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+          {!isSoldier && (
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3">
+              <LockedField label="Email" value={email || "—"} />
+              <LockedField label="NIN" value={snapshot?.nin || "—"} mono />
+              <LockedField
+                label="Date for sign in"
+                value={snapshot?.created_at ? new Date(snapshot.created_at).toLocaleDateString() : "—"}
+              />
+            </div>
+          )}
           <label className="text-xs">
             <span className="block mb-1 text-on-surface-variant">Full name</span>
             <input
@@ -825,17 +877,19 @@ function ProfileDetailsCard({
             </label>
           )}
           <label className="text-xs">
-            <span className="block mb-1 text-on-surface-variant">Region</span>
+            <span className="block mb-1 text-on-surface-variant">Region <span className="text-error">*</span></span>
             <select
               value={region}
-              onChange={(e) => setRegion(e.target.value)}
-              className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+              onChange={(e) => { setRegion(e.target.value); if (regionErr) setRegionErr(null); }}
+              aria-invalid={!!regionErr}
+              className={`w-full px-3 py-2.5 bg-surface-container-low border rounded-md text-sm ${regionErr ? "border-error" : "border-outline-variant"}`}
             >
               <option value="">—</option>
               {REGIONS.map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
             </select>
+            {regionErr && <p className="mt-1 text-[11px] text-error">{regionErr}</p>}
           </label>
           {isSoldier && (
             <label className="text-xs">
