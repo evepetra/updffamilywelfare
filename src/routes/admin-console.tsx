@@ -6,6 +6,11 @@ import { Icon } from "@/components/Icon";
 import { supabase } from "@/integrations/supabase/client";
 import { adminListUsers, requireAdmin } from "@/lib/auth/roles.functions";
 import { useAuth } from "@/hooks/use-auth";
+import {
+  buildMembersCsv,
+  buildDisbursementsCsv,
+  downloadCsv,
+} from "@/lib/admin/service-filters";
 
 type AppRole = "family" | "soldier" | "officer" | "admin" | "system_admin";
 const ROLE_LABEL: Record<AppRole, string> = {
