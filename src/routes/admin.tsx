@@ -99,6 +99,9 @@ function AdminDashboard() {
   const [page, setPage] = useState(1);
   const pageSize = 10;
   const [auditOpen, setAuditOpen] = useState(false);
+  const [ledgerFromDate, setLedgerFromDate] = useState("");
+  const [ledgerToDate, setLedgerToDate] = useState("");
+  const [ledgerStatusFilter, setLedgerStatusFilter] = useState<string>("all");
   // System Administrators may VIEW the Welfare Officer console for oversight,
   // but they cannot approve, reject, or disburse aid — only officers/admins
   // can take action on requests.
@@ -198,13 +201,14 @@ function AdminDashboard() {
   async function updateStatus(
     id: string,
     status: string,
-    extra?: { amount_approved?: number | null },
+    extra?: { amount_approved?: number | null; decision_reason?: string | null },
   ) {
     await supabase
       .from("support_requests")
       .update({
         status,
         ...(extra && "amount_approved" in extra ? { amount_approved: extra.amount_approved } : {}),
+        ...(extra && "decision_reason" in extra ? { decision_reason: extra.decision_reason } : {}),
       })
       .eq("id", id);
     qc.invalidateQueries({ queryKey: ["admin-requests"] });
@@ -224,7 +228,25 @@ function AdminDashboard() {
       window.alert("Please enter a valid positive amount.");
       return;
     }
-    await updateStatus(id, "approved", { amount_approved: amt });
+    const reason = window.prompt(
+      "Reason / note for this approval (recorded in the audit log):",
+      "",
+    );
+    if (reason == null) return;
+    await updateStatus(id, "approved", { amount_approved: amt, decision_reason: reason });
+  }
+
+  async function rejectWithReason(id: string) {
+    const reason = window.prompt(
+      "Reason for rejecting this request (required, recorded in the audit log):",
+      "",
+    );
+    if (reason == null) return;
+    if (!reason.trim()) {
+      window.alert("A rejection reason is required.");
+      return;
+    }
+    await updateStatus(id, "rejected", { decision_reason: reason.trim() });
   }
 
   if (auth.loading) return null;
