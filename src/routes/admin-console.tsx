@@ -157,6 +157,11 @@ function AdminConsole() {
     if (!window.confirm(
       `Disburse UGX ${(row.amount_approved ?? 0).toLocaleString()} to ${p.full_name} (${p.payout_provider} • ${p.payout_account_number})?`,
     )) return;
+    const reason = window.prompt(
+      "Reason / note for this disbursal (recorded in the audit log):",
+      "",
+    );
+    if (reason == null) return;
     setDisbursingId(row.id);
     const { error: insErr } = await supabase.from("aid_ledger").insert({
       recipient_user_id: row.user_id,
@@ -167,6 +172,7 @@ function AdminConsole() {
       amount: row.amount_approved ?? 0,
       status: "disbursed",
       disbursed_at: new Date().toISOString(),
+      reason: reason.trim() || null,
       payout_method: p.payout_method,
       payout_provider: p.payout_provider,
       payout_account_name: p.payout_account_name,
