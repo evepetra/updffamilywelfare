@@ -123,6 +123,9 @@ function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signupNotice, setSignupNotice] = useState<string | null>(null);
+  const [resendBusy, setResendBusy] = useState(false);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
+  const [lastSignupEmail, setLastSignupEmail] = useState<string>("");
   const [fieldErrors, setFieldErrors] = useState<{
     email?: string;
     password?: string;
@@ -197,6 +200,8 @@ function LoginPage() {
           setSignupNotice(
             `Account created. We've sent a confirmation email to ${parsed.data.email}. If you don't see it in your inbox within a few minutes, please check your Spam or Junk folder.`,
           );
+          setLastSignupEmail(parsed.data.email);
+          setResendMsg(null);
           setMode("signin");
         }
       } else {
@@ -564,7 +569,41 @@ function LoginPage() {
                   className="text-sm text-primary bg-primary-fixed-dim/60 border border-primary/30 rounded-md px-3 py-2 flex gap-2"
                 >
                   <Icon name="mark_email_read" className="text-[18px] mt-0.5" />
-                  <span>{signupNotice}</span>
+                  <div className="flex-1">
+                    <p>{signupNotice}</p>
+                    {lastSignupEmail && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={resendBusy}
+                          onClick={async () => {
+                            setResendBusy(true);
+                            setResendMsg(null);
+                            const { error } = await supabase.auth.resend({
+                              type: "signup",
+                              email: lastSignupEmail,
+                              options: {
+                                emailRedirectTo: `${window.location.origin}/dashboard`,
+                              },
+                            });
+                            setResendBusy(false);
+                            setResendMsg(
+                              error
+                                ? `Could not resend: ${error.message}`
+                                : `Confirmation email resent to ${lastSignupEmail}. Please check your inbox and Spam folder.`,
+                            );
+                          }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded border border-primary text-primary hover:bg-primary hover:text-on-primary disabled:opacity-50"
+                        >
+                          <Icon name="forward_to_inbox" className="text-[14px]" />
+                          {resendBusy ? "Resending…" : "Resend confirmation email"}
+                        </button>
+                        {resendMsg && (
+                          <span className="text-xs text-on-surface-variant">{resendMsg}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 

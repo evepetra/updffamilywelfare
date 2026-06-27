@@ -104,6 +104,9 @@ function AdminDashboard() {
   // can take action on requests.
   const isStaff = auth.isOfficer || auth.isAdmin || auth.isSystemAdmin;
   const canActOnRequests = auth.isOfficer || auth.isAdmin;
+  const viewOnly = auth.isSystemAdmin && !auth.isOfficer && !auth.isAdmin;
+  const lockTooltip =
+    "Locked for System Administrators. Only Welfare Officers and Administrators can act on requests; system_admin holds oversight-only access enforced in the database (RLS).";
 
   const requestsQuery = useQuery({
     queryKey: ["admin-requests"],
@@ -271,6 +274,23 @@ function AdminDashboard() {
         </>
       }
     >
+      {viewOnly && (
+        <div
+          role="status"
+          className="mb-6 flex items-start gap-3 rounded-lg border border-primary/40 bg-primary-fixed-dim/50 px-4 py-3 text-sm"
+        >
+          <Icon name="visibility" fill className="text-[20px] text-primary mt-0.5" />
+          <div>
+            <p className="font-semibold text-primary">View-only oversight mode</p>
+            <p className="text-xs text-on-surface-variant mt-0.5">
+              You are signed in as a <span className="font-semibold">System Administrator</span>.
+              Approve, Reject and Disburse actions are disabled — these are reserved for
+              Welfare Officers and Administrators and are also blocked at the database level (RLS)
+              for system_admin accounts.
+            </p>
+          </div>
+        </div>
+      )}
       {/* KPI row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {kpis.map((k) => (
@@ -423,6 +443,7 @@ function AdminDashboard() {
                             <button
                               onClick={() => approveWithAmount(r.id)}
                               disabled={r.status === "approved" || r.status === "completed"}
+                              title="Approve this request and set the aid amount"
                               className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded bg-primary text-on-primary hover:bg-primary-container disabled:opacity-40"
                             >
                               <Icon name="check" className="text-[14px]" />
@@ -431,6 +452,7 @@ function AdminDashboard() {
                             <button
                               onClick={() => updateStatus(r.id, "rejected")}
                               disabled={r.status === "rejected"}
+                              title="Reject this request"
                               className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded border border-error text-error hover:bg-red-50 disabled:opacity-40"
                             >
                               <Icon name="close" className="text-[14px]" />
@@ -438,13 +460,28 @@ function AdminDashboard() {
                             </button>
                           </>
                         ) : (
-                          <span
-                            title="System Administrators have view-only oversight; approvals are performed by welfare officers."
-                            className="inline-flex items-center gap-1 text-xs text-on-surface-variant"
-                          >
-                            <Icon name="visibility" className="text-[14px]" />
-                            View only
-                          </span>
+                          <div className="inline-flex items-center gap-1.5 justify-end">
+                            <button
+                              type="button"
+                              disabled
+                              title={lockTooltip}
+                              aria-label={"Approve disabled. " + lockTooltip}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded bg-primary text-on-primary opacity-40 cursor-not-allowed"
+                            >
+                              <Icon name="lock" className="text-[14px]" />
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              disabled
+                              title={lockTooltip}
+                              aria-label={"Reject disabled. " + lockTooltip}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded border border-error text-error opacity-40 cursor-not-allowed"
+                            >
+                              <Icon name="lock" className="text-[14px]" />
+                              Reject
+                            </button>
+                          </div>
                         )}
                       </div>
                     </td>
@@ -520,6 +557,66 @@ function AdminDashboard() {
             </div>
           </section>
         )}
+
+        {/* Disbursed Aid Report — read-only ledger view for the welfare officer */}
+        <section className="col-span-12 bg-card border border-outline-variant rounded-lg overflow-hidden">
+          <div className="p-5 border-b border-outline-variant flex flex-wrap justify-between items-center gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-primary flex items-center gap-2">
+                <Icon name="payments" fill className="text-[20px]" />
+                Disbursed Aid Report
+              </h2>
+              <p className="text-xs text-on-surface-variant">
+                {ledger.filter((l) => l.status === "disbursed").length} disbursals · {fmtCompactUGX(
+                  ledger.filter((l) => l.status === "disbursed").reduce((s, l) => s + Number(l.amount || 0), 0),
+                )} released
+              </p>
+            </div>
+            <Link
+              to="/ledger"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-outline-variant hover:bg-surface-container"
+            >
+              <Icon name="open_in_new" className="text-[14px]" />
+              Open full ledger
+            </Link>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-surface-container-low text-on-surface-variant text-xs uppercase tracking-wider">
+                <tr>
+                  <th className="text-left px-5 py-3 font-medium">Date</th>
+                  <th className="text-left px-5 py-3 font-medium">Recipient</th>
+                  <th className="text-left px-5 py-3 font-medium">Region</th>
+                  <th className="text-left px-5 py-3 font-medium">Aid Type</th>
+                  <th className="text-right px-5 py-3 font-medium">Amount (UGX)</th>
+                  <th className="text-left px-5 py-3 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant">
+                {ledgerQuery.isLoading && (
+                  <tr><td colSpan={6} className="text-center py-8 text-on-surface-variant text-sm">Loading…</td></tr>
+                )}
+                {!ledgerQuery.isLoading && ledger.length === 0 && (
+                  <tr><td colSpan={6} className="text-center py-8 text-on-surface-variant text-sm">No disbursals recorded yet.</td></tr>
+                )}
+                {ledger.slice(0, 25).map((l) => (
+                  <tr key={l.id} className="hover:bg-surface-bright">
+                    <td className="px-5 py-3 text-on-surface-variant whitespace-nowrap">
+                      {new Date(l.disbursed_at ?? l.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-5 py-3 font-medium">{l.recipient_name}</td>
+                    <td className="px-5 py-3">{l.region}</td>
+                    <td className="px-5 py-3">{l.aid_type}</td>
+                    <td className="px-5 py-3 text-right font-mono">
+                      {Number(l.amount || 0).toLocaleString("en-UG")}
+                    </td>
+                    <td className="px-5 py-3"><StatusPill status={l.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
 
     </AppShell>
