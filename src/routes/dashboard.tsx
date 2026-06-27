@@ -504,6 +504,7 @@ function SoldierRelationshipCard({ userId }: { userId: string }) {
   const [svc, setSvc] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [regionErr, setRegionErr] = useState<string | null>(null);
 
   useEffect(() => {
     setRel(initial?.relationship_to_soldier ?? "");
