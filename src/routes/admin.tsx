@@ -104,6 +104,9 @@ function AdminDashboard() {
   // can take action on requests.
   const isStaff = auth.isOfficer || auth.isAdmin || auth.isSystemAdmin;
   const canActOnRequests = auth.isOfficer || auth.isAdmin;
+  const viewOnly = auth.isSystemAdmin && !auth.isOfficer && !auth.isAdmin;
+  const lockTooltip =
+    "Locked for System Administrators. Only Welfare Officers and Administrators can act on requests; system_admin holds oversight-only access enforced in the database (RLS).";
 
   const requestsQuery = useQuery({
     queryKey: ["admin-requests"],
@@ -271,6 +274,23 @@ function AdminDashboard() {
         </>
       }
     >
+      {viewOnly && (
+        <div
+          role="status"
+          className="mb-6 flex items-start gap-3 rounded-lg border border-primary/40 bg-primary-fixed-dim/50 px-4 py-3 text-sm"
+        >
+          <Icon name="visibility" fill className="text-[20px] text-primary mt-0.5" />
+          <div>
+            <p className="font-semibold text-primary">View-only oversight mode</p>
+            <p className="text-xs text-on-surface-variant mt-0.5">
+              You are signed in as a <span className="font-semibold">System Administrator</span>.
+              Approve, Reject and Disburse actions are disabled — these are reserved for
+              Welfare Officers and Administrators and are also blocked at the database level (RLS)
+              for system_admin accounts.
+            </p>
+          </div>
+        </div>
+      )}
       {/* KPI row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {kpis.map((k) => (
@@ -423,6 +443,7 @@ function AdminDashboard() {
                             <button
                               onClick={() => approveWithAmount(r.id)}
                               disabled={r.status === "approved" || r.status === "completed"}
+                              title="Approve this request and set the aid amount"
                               className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded bg-primary text-on-primary hover:bg-primary-container disabled:opacity-40"
                             >
                               <Icon name="check" className="text-[14px]" />
@@ -431,6 +452,7 @@ function AdminDashboard() {
                             <button
                               onClick={() => updateStatus(r.id, "rejected")}
                               disabled={r.status === "rejected"}
+                              title="Reject this request"
                               className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded border border-error text-error hover:bg-red-50 disabled:opacity-40"
                             >
                               <Icon name="close" className="text-[14px]" />
@@ -438,13 +460,28 @@ function AdminDashboard() {
                             </button>
                           </>
                         ) : (
-                          <span
-                            title="System Administrators have view-only oversight; approvals are performed by welfare officers."
-                            className="inline-flex items-center gap-1 text-xs text-on-surface-variant"
-                          >
-                            <Icon name="visibility" className="text-[14px]" />
-                            View only
-                          </span>
+                          <div className="inline-flex items-center gap-1.5 justify-end">
+                            <button
+                              type="button"
+                              disabled
+                              title={lockTooltip}
+                              aria-label={"Approve disabled. " + lockTooltip}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded bg-primary text-on-primary opacity-40 cursor-not-allowed"
+                            >
+                              <Icon name="lock" className="text-[14px]" />
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              disabled
+                              title={lockTooltip}
+                              aria-label={"Reject disabled. " + lockTooltip}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded border border-error text-error opacity-40 cursor-not-allowed"
+                            >
+                              <Icon name="lock" className="text-[14px]" />
+                              Reject
+                            </button>
+                          </div>
                         )}
                       </div>
                     </td>
