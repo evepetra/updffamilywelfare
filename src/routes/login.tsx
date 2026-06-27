@@ -482,6 +482,41 @@ function LoginPage() {
                       </p>
                     )}
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-on-surface mb-1.5">
+                      Region
+                    </label>
+                    <div className="relative">
+                      <Icon
+                        name="public"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]"
+                      />
+                      <select
+                        required
+                        value={region}
+                        onChange={(e) => setRegion(e.target.value)}
+                        aria-invalid={!!fieldErrors.region}
+                        className={
+                          "w-full pl-10 pr-4 py-3 bg-surface-container-low border rounded-md focus:outline-none text-sm appearance-none " +
+                          (fieldErrors.region
+                            ? "border-error focus:border-error"
+                            : "border-outline-variant focus:border-primary")
+                        }
+                      >
+                        <option value="">Select your region…</option>
+                        {(["Central","Western","Northern","Eastern","West Nile"] as const).map((r) => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {fieldErrors.region ? (
+                      <p className="mt-1.5 text-xs text-error">{fieldErrors.region}</p>
+                    ) : (
+                      <p className="mt-1.5 text-xs text-on-surface-variant">
+                        Pick the UPDF service region you belong to. Used for regional aid reporting.
+                      </p>
+                    )}
+                  </div>
                   {signupRole === "soldier" && (
                     <div>
                       <label className="block text-sm font-medium text-on-surface mb-1.5">
