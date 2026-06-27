@@ -475,6 +475,192 @@ function PayoutAccountCard({
   );
 }
 
+function SoldierRelationshipCard({ userId }: { userId: string }) {
+  const qc = useQueryClient();
+  const q = useQuery({
+    queryKey: ["my-relationship", userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select(
+          "relationship_to_soldier, related_soldier_full_name, related_soldier_service_number, related_soldier_rank, related_soldier_service",
+        )
+        .eq("id", userId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+  const initial = q.data;
+  const [editing, setEditing] = useState(false);
+  const [rel, setRel] = useState("");
+  const [name, setName] = useState("");
+  const [svcNum, setSvcNum] = useState("");
+  const [rnk, setRnk] = useState("");
+  const [svc, setSvc] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    setRel(initial?.relationship_to_soldier ?? "");
+    setName(initial?.related_soldier_full_name ?? "");
+    setSvcNum(initial?.related_soldier_service_number ?? "");
+    setRnk(initial?.related_soldier_rank ?? "");
+    setSvc(initial?.related_soldier_service ?? "");
+  }, [initial]);
+
+  const hasData = !!(initial?.relationship_to_soldier || initial?.related_soldier_full_name);
+
+  async function save() {
+    if (!userId) return;
+    setBusy(true);
+    setErr(null);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        relationship_to_soldier: rel || null,
+        related_soldier_full_name: name.trim() || null,
+        related_soldier_service_number: svcNum.trim().toUpperCase() || null,
+        related_soldier_rank: rnk || null,
+        related_soldier_service: svc || null,
+      })
+      .eq("id", userId);
+    setBusy(false);
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+    setEditing(false);
+    qc.invalidateQueries({ queryKey: ["my-relationship", userId] });
+  }
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-semibold text-primary flex items-center gap-2">
+            <Icon name="diversity_3" fill className="text-[22px]" />
+            Soldier Relationship Details
+          </h2>
+          <p className="text-xs text-on-surface-variant mt-0.5">
+            Details of the soldier you are related to (used to verify welfare eligibility).
+          </p>
+        </div>
+        {!editing && (
+          <button
+            onClick={() => setEditing(true)}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary border border-primary px-3 py-1.5 rounded-md hover:bg-primary hover:text-on-primary"
+          >
+            <Icon name={hasData ? "edit" : "add"} className="text-[16px]" />
+            {hasData ? "Update" : "Add details"}
+          </button>
+        )}
+      </div>
+      {!editing ? (
+        hasData ? (
+          <dl className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+            <Field label="Relationship" value={initial?.relationship_to_soldier || "—"} />
+            <Field label="Soldier's Full Name" value={initial?.related_soldier_full_name || "—"} />
+            <Field label="Service Number" value={initial?.related_soldier_service_number || "—"} mono />
+            <Field label="Rank" value={initial?.related_soldier_rank || "—"} />
+            <Field label="UPDF Service" value={initial?.related_soldier_service || "—"} />
+          </dl>
+        ) : (
+          <p className="mt-4 text-sm text-on-surface-variant">
+            No soldier relationship details on file yet. Add them so welfare officers can verify your link.
+          </p>
+        )
+      ) : (
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+          <label className="text-xs">
+            <span className="block mb-1 text-on-surface-variant">Relationship to Soldier</span>
+            <select
+              value={rel}
+              onChange={(e) => setRel(e.target.value)}
+              className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+            >
+              <option value="">—</option>
+              <optgroup label="Primary">
+                {["Father","Mother","Wife","Husband","Son","Daughter"].map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Adopted / Extended">
+                {["Brother","Sister","Aunt","Uncle","Cousin","Other"].map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </optgroup>
+            </select>
+          </label>
+          <label className="text-xs">
+            <span className="block mb-1 text-on-surface-variant">Soldier's Full Name</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+            />
+          </label>
+          <label className="text-xs">
+            <span className="block mb-1 text-on-surface-variant">Soldier's Service Number</span>
+            <input
+              value={svcNum}
+              onChange={(e) => setSvcNum(e.target.value.toUpperCase())}
+              placeholder="e.g. RA/123456"
+              className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm font-mono uppercase"
+            />
+          </label>
+          <label className="text-xs">
+            <span className="block mb-1 text-on-surface-variant">Soldier's Rank</span>
+            <select
+              value={rnk}
+              onChange={(e) => setRnk(e.target.value)}
+              className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+            >
+              <option value="">—</option>
+              {RANKS.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs md:col-span-2">
+            <span className="block mb-1 text-on-surface-variant">Soldier's UPDF Service</span>
+            <select
+              value={svc}
+              onChange={(e) => setSvc(e.target.value)}
+              className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+            >
+              <option value="">—</option>
+              {SERVICES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </label>
+          {/* Hint to keep RELATIONSHIPS referenced (full list lives in select above) */}
+          <input type="hidden" value={RELATIONSHIPS.length} readOnly />
+          {err && <p className="md:col-span-2 text-sm text-error">{err}</p>}
+          <div className="md:col-span-2 flex justify-end gap-2 mt-1">
+            <button
+              onClick={() => setEditing(false)}
+              disabled={busy}
+              className="px-4 py-2 text-sm border border-outline-variant rounded-md hover:bg-surface-container"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              disabled={busy}
+              className="px-4 py-2 text-sm font-semibold bg-primary text-on-primary rounded-md hover:bg-primary-container disabled:opacity-50"
+            >
+              {busy ? "Saving…" : "Save details"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div>
