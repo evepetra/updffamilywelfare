@@ -67,6 +67,14 @@ const UPDF_REGIONS = [
   "West Nile",
 ] as const;
 
+// UPDF services a soldier may belong to (constrained on profiles.service in the DB)
+const UPDF_SERVICES = [
+  "Air Force",
+  "SFC",
+  "Land Force",
+  "Reserve Force",
+] as const;
+
 const signInSchema = z.object({
   email: z
     .string()
@@ -115,6 +123,12 @@ const soldierSignUpSchema = baseSignUpSchema.extend({
     .refine((v) => (UPDF_RANKS as readonly string[]).includes(v), {
       message: "Select a valid rank (Private to General)",
     }),
+  service: z
+    .string()
+    .trim()
+    .refine((v) => (UPDF_SERVICES as readonly string[]).includes(v), {
+      message: "Select your UPDF service",
+    }),
 });
 
 function LoginPage() {
@@ -136,6 +150,7 @@ function LoginPage() {
   const [armyNumber, setArmyNumber] = useState("");
   const [rank, setRank] = useState<string>("");
   const [region, setRegion] = useState<string>("");
+  const [service, setService] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signupNotice, setSignupNotice] = useState<string | null>(null);
@@ -160,6 +175,7 @@ function LoginPage() {
     armyNumber?: string;
     rank?: string;
     region?: string;
+    service?: string;
   }>({});
 
   useEffect(() => {
@@ -182,7 +198,7 @@ function LoginPage() {
         const schema = role === "soldier" ? soldierSignUpSchema : familySignUpSchema;
         const parsed = schema.safeParse(
           role === "soldier"
-            ? { email, password, fullName, nin, region, armyNumber, rank }
+            ? { email, password, fullName, nin, region, armyNumber, rank, service }
             : { email, password, fullName, nin, region },
         );
         if (!parsed.success) {
@@ -212,7 +228,7 @@ function LoginPage() {
               region: parsed.data.region,
               signup_role: role,
               ...(role === "soldier"
-                ? { army_number: army, service_number: army, rank }
+                ? { army_number: army, service_number: army, rank, service }
                 : {}),
             },
           },
@@ -541,6 +557,43 @@ function LoginPage() {
                       </select>
                       {fieldErrors.rank && (
                         <p className="mt-1.5 text-xs text-error">{fieldErrors.rank}</p>
+                      )}
+                    </div>
+                  )}
+                  {signupRole === "soldier" && (
+                    <div>
+                      <label className="block text-sm font-medium text-on-surface mb-1.5">
+                        UPDF Service
+                      </label>
+                      <div className="relative">
+                        <Icon
+                          name="military_tech"
+                          className="absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]"
+                        />
+                        <select
+                          required
+                          value={service}
+                          onChange={(e) => setService(e.target.value)}
+                          aria-invalid={!!fieldErrors.service}
+                          className={
+                            "w-full pl-10 pr-4 py-3 bg-surface-container-low border rounded-md focus:outline-none text-sm appearance-none " +
+                            (fieldErrors.service
+                              ? "border-error focus:border-error"
+                              : "border-outline-variant focus:border-primary")
+                          }
+                        >
+                          <option value="">Select your UPDF service…</option>
+                          {UPDF_SERVICES.map((s) => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {fieldErrors.service ? (
+                        <p className="mt-1.5 text-xs text-error">{fieldErrors.service}</p>
+                      ) : (
+                        <p className="mt-1.5 text-xs text-on-surface-variant">
+                          Choose the UPDF service you serve under: Air Force, SFC, Land Force, or Reserve Force.
+                        </p>
                       )}
                     </div>
                   )}
