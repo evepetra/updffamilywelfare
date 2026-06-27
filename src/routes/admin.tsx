@@ -166,7 +166,7 @@ function AdminDashboard() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("request_status_audit")
-        .select("id, request_id, actor_id, old_status, new_status, created_at")
+        .select("id, request_id, actor_id, old_status, new_status, reason, created_at")
         .order("created_at", { ascending: false })
         .limit(100);
       if (error) throw error;
@@ -551,15 +551,16 @@ function AdminDashboard() {
                     <th className="text-left px-5 py-3 font-medium">Request</th>
                     <th className="text-left px-5 py-3 font-medium">From</th>
                     <th className="text-left px-5 py-3 font-medium">To</th>
+                    <th className="text-left px-5 py-3 font-medium">Reason</th>
                     <th className="text-left px-5 py-3 font-medium">Actor</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant">
                   {auditQuery.isLoading && (
-                    <tr><td colSpan={5} className="text-center py-8 text-on-surface-variant text-sm">Loading…</td></tr>
+                    <tr><td colSpan={6} className="text-center py-8 text-on-surface-variant text-sm">Loading…</td></tr>
                   )}
                   {auditQuery.data?.length === 0 && (
-                    <tr><td colSpan={5} className="text-center py-8 text-on-surface-variant text-sm">No audit entries yet.</td></tr>
+                    <tr><td colSpan={6} className="text-center py-8 text-on-surface-variant text-sm">No audit entries yet.</td></tr>
                   )}
                   {(auditQuery.data ?? []).map((a) => (
                     <tr key={a.id}>
@@ -569,6 +570,9 @@ function AdminDashboard() {
                       <td className="px-5 py-3 font-mono text-xs">#{a.request_id.slice(0, 8).toUpperCase()}</td>
                       <td className="px-5 py-3 capitalize">{a.old_status ?? "—"}</td>
                       <td className="px-5 py-3"><StatusPill status={a.new_status} /></td>
+                      <td className="px-5 py-3 text-xs text-on-surface-variant max-w-[24ch] truncate" title={a.reason ?? ""}>
+                        {a.reason ?? "—"}
+                      </td>
                       <td className="px-5 py-3 font-mono text-xs text-on-surface-variant">
                         {a.actor_id ? a.actor_id.slice(0, 8) : "system"}
                       </td>
