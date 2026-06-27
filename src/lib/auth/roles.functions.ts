@@ -82,6 +82,7 @@ export type AdminUserRow = {
   email: string | null;
   full_name: string;
   service_number: string;
+  service: string;
   roles: AppRole[];
   created_at: string;
 };
@@ -113,16 +114,24 @@ export const adminListUsers = createServerFn({ method: "GET" })
     const ids = users.map((u) => u.id);
 
     const [{ data: profiles, error: pErr }, { data: roles, error: rErr }] = await Promise.all([
-      supabaseAdmin.from("profiles").select("id, full_name, service_number").in("id", ids),
+      supabaseAdmin
+        .from("profiles")
+        .select("id, full_name, service_number, service")
+        .in("id", ids),
       supabaseAdmin.from("user_roles").select("user_id, role").in("user_id", ids),
     ]);
     if (pErr) throw new Error(pErr.message);
     if (rErr) throw new Error(rErr.message);
 
     const profileMap = new Map(
-      ((profiles ?? []) as { id: string; full_name: string | null; service_number: string | null }[]).map(
-        (p) => [p.id, p],
-      ),
+      (
+        (profiles ?? []) as {
+          id: string;
+          full_name: string | null;
+          service_number: string | null;
+          service: string | null;
+        }[]
+      ).map((p) => [p.id, p]),
     );
     const rolesMap = new Map<string, AppRole[]>();
     for (const r of (roles ?? []) as { user_id: string; role: AppRole }[]) {
@@ -139,6 +148,7 @@ export const adminListUsers = createServerFn({ method: "GET" })
           email: u.email ?? null,
           full_name: p?.full_name ?? "",
           service_number: p?.service_number ?? "",
+          service: p?.service ?? "",
           roles: (rolesMap.get(u.id) ?? []).sort(),
           created_at: u.created_at,
         };
