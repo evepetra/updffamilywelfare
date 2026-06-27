@@ -111,7 +111,14 @@ function FamilyDashboard() {
 
         {/* Soldier relationship — captured from family members (and editable by soldiers too) */}
         <section className="col-span-12 bg-card rounded-lg border border-outline-variant p-6">
-          <SoldierRelationshipCard userId={user?.id ?? ""} />
+          {isSoldier ? (
+            <FamilyMemberDetailsCard
+              userId={user?.id ?? ""}
+              payout={payoutQuery.data ?? null}
+            />
+          ) : (
+            <SoldierRelationshipCard userId={user?.id ?? ""} />
+          )}
         </section>
 
         <section className="col-span-12 bg-card rounded-lg border border-outline-variant border-l-4 border-l-primary p-6">
