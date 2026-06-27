@@ -472,7 +472,7 @@ function AdminDashboard() {
                               Approve
                             </button>
                             <button
-                              onClick={() => updateStatus(r.id, "rejected")}
+                              onClick={() => rejectWithReason(r.id)}
                               disabled={r.status === "rejected"}
                               title="Reject this request"
                               className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded border border-error text-error hover:bg-red-50 disabled:opacity-40"
