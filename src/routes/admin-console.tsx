@@ -10,6 +10,7 @@ import {
   buildMembersCsv,
   buildDisbursementsCsv,
   downloadCsv,
+  filterAndSortMembers,
 } from "@/lib/admin/service-filters";
 
 type AppRole = "family" | "soldier" | "officer" | "admin" | "system_admin";
@@ -219,30 +220,16 @@ function AdminConsole() {
   });
 
   const users = usersQuery.data ?? [];
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const matched = users.filter((u) => {
-      if (serviceFilter !== "all" && (u.service ?? "") !== serviceFilter) return false;
-      if (!q) return true;
-      return (
-        (u.email ?? "").toLowerCase().includes(q) ||
-        (u.full_name ?? "").toLowerCase().includes(q) ||
-        (u.service_number ?? "").toLowerCase().includes(q) ||
-        (u.service ?? "").toLowerCase().includes(q)
-      );
-    });
-    const sorted = [...matched].sort((a, b) => {
-      const dir = sortDir === "asc" ? 1 : -1;
-      if (sortBy === "service") {
-        return ((a.service ?? "").localeCompare(b.service ?? "")) * dir;
-      }
-      if (sortBy === "full_name") {
-        return ((a.full_name ?? "").localeCompare(b.full_name ?? "")) * dir;
-      }
-      return (a.created_at < b.created_at ? 1 : -1) * dir;
-    });
-    return sorted;
-  }, [users, search, serviceFilter, sortBy, sortDir]);
+  const filtered = useMemo(
+    () =>
+      filterAndSortMembers(users, {
+        search,
+        serviceFilter: serviceFilter as "all" | string as never,
+        sortBy,
+        sortDir,
+      }),
+    [users, search, serviceFilter, sortBy, sortDir],
+  );
 
   function toggleSort(col: "created_at" | "service" | "full_name") {
     if (sortBy === col) {
