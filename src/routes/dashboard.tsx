@@ -102,6 +102,7 @@ function FamilyDashboard() {
           <ProfileDetailsCard
             userId={user?.id ?? ""}
             isSoldier={isSoldier}
+            email={user?.email}
             initial={profile}
             onSaved={() => qc.invalidateQueries({ queryKey: ["my-payout"] })}
           />
@@ -676,6 +677,8 @@ type ProfileInfo = {
   service: string | null;
   rank: string | null;
   region: string | null;
+  nin: string | null;
+  created_at: string | null;
 } | null;
 
 const RANKS = [
@@ -693,11 +696,13 @@ const RELATIONSHIPS = [
 function ProfileDetailsCard({
   userId,
   isSoldier,
+  email,
   initial,
   onSaved,
 }: {
   userId: string;
   isSoldier: boolean;
+  email: string | undefined;
   initial: ProfileInfo;
   onSaved: () => void;
 }) {
@@ -724,9 +729,8 @@ function ProfileDetailsCard({
     setErr(null);
     const payload = {
       full_name: fullName.trim() || null,
-      rank: rank.trim() || null,
       region: region.trim() || null,
-      ...(isSoldier ? { service: service.trim() || null } : {}),
+      ...(isSoldier ? { rank: rank.trim() || null, service: service.trim() || null } : {}),
     };
     const { error } = await supabase.from("profiles").update(payload).eq("id", userId);
     setBusy(false);
@@ -738,8 +742,10 @@ function ProfileDetailsCard({
       full_name: payload.full_name,
       service_number: snapshot?.service_number ?? null,
       service: isSoldier ? service.trim() || null : snapshot?.service ?? null,
-      rank: payload.rank,
+      rank: (isSoldier ? payload.rank : snapshot?.rank) ?? null,
       region: payload.region,
+      nin: snapshot?.nin ?? null,
+      created_at: snapshot?.created_at ?? null,
     });
     setEditing(false);
     onSaved();
@@ -758,7 +764,7 @@ function ProfileDetailsCard({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {snapshot?.service && (
+          {isSoldier && snapshot?.service && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-on-primary text-xs font-semibold">
               <Icon name="military_tech" fill className="text-[14px]" />
               {snapshot.service}
@@ -778,9 +784,19 @@ function ProfileDetailsCard({
       {!editing ? (
         <dl className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <Field label="Full name" value={snapshot?.full_name || "—"} />
-          <Field label="UPDF Service" value={snapshot?.service || "Not assigned"} />
-          <Field label="Rank" value={snapshot?.rank || "—"} />
-          <Field label="Service / Army #" value={snapshot?.service_number || "—"} mono />
+          {isSoldier ? (
+            <>
+              <Field label="UPDF Service" value={snapshot?.service || "Not assigned"} />
+              <Field label="Rank" value={snapshot?.rank || "—"} />
+              <Field label="Service / Army #" value={snapshot?.service_number || "—"} mono />
+            </>
+          ) : (
+            <>
+              <Field label="Email" value={email || "—"} />
+              <Field label="NIN" value={snapshot?.nin || "—"} mono />
+              <Field label="Date for sign in" value={snapshot?.created_at ? new Date(snapshot.created_at).toLocaleDateString() : "—"} />
+            </>
+          )}
           <Field label="Region" value={snapshot?.region || "—"} />
         </dl>
       ) : (
@@ -793,19 +809,21 @@ function ProfileDetailsCard({
               className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
             />
           </label>
-          <label className="text-xs">
-            <span className="block mb-1 text-on-surface-variant">Rank</span>
-            <select
-              value={rank}
-              onChange={(e) => setRank(e.target.value)}
-              className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
-            >
-              <option value="">—</option>
-              {RANKS.map((r) => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
-          </label>
+          {isSoldier && (
+            <label className="text-xs">
+              <span className="block mb-1 text-on-surface-variant">Rank</span>
+              <select
+                value={rank}
+                onChange={(e) => setRank(e.target.value)}
+                className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+              >
+                <option value="">—</option>
+                {RANKS.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="text-xs">
             <span className="block mb-1 text-on-surface-variant">Region</span>
             <select
