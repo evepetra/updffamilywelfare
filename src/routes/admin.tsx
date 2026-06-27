@@ -99,6 +99,9 @@ function AdminDashboard() {
   const [page, setPage] = useState(1);
   const pageSize = 10;
   const [auditOpen, setAuditOpen] = useState(false);
+  const [ledgerFromDate, setLedgerFromDate] = useState("");
+  const [ledgerToDate, setLedgerToDate] = useState("");
+  const [ledgerStatusFilter, setLedgerStatusFilter] = useState<string>("all");
   // System Administrators may VIEW the Welfare Officer console for oversight,
   // but they cannot approve, reject, or disburse aid — only officers/admins
   // can take action on requests.
@@ -163,7 +166,7 @@ function AdminDashboard() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("request_status_audit")
-        .select("id, request_id, actor_id, old_status, new_status, created_at")
+        .select("id, request_id, actor_id, old_status, new_status, reason, created_at")
         .order("created_at", { ascending: false })
         .limit(100);
       if (error) throw error;
@@ -198,13 +201,14 @@ function AdminDashboard() {
   async function updateStatus(
     id: string,
     status: string,
-    extra?: { amount_approved?: number | null },
+    extra?: { amount_approved?: number | null; decision_reason?: string | null },
   ) {
     await supabase
       .from("support_requests")
       .update({
         status,
         ...(extra && "amount_approved" in extra ? { amount_approved: extra.amount_approved } : {}),
+        ...(extra && "decision_reason" in extra ? { decision_reason: extra.decision_reason } : {}),
       })
       .eq("id", id);
     qc.invalidateQueries({ queryKey: ["admin-requests"] });
@@ -224,7 +228,25 @@ function AdminDashboard() {
       window.alert("Please enter a valid positive amount.");
       return;
     }
-    await updateStatus(id, "approved", { amount_approved: amt });
+    const reason = window.prompt(
+      "Reason / note for this approval (recorded in the audit log):",
+      "",
+    );
+    if (reason == null) return;
+    await updateStatus(id, "approved", { amount_approved: amt, decision_reason: reason });
+  }
+
+  async function rejectWithReason(id: string) {
+    const reason = window.prompt(
+      "Reason for rejecting this request (required, recorded in the audit log):",
+      "",
+    );
+    if (reason == null) return;
+    if (!reason.trim()) {
+      window.alert("A rejection reason is required.");
+      return;
+    }
+    await updateStatus(id, "rejected", { decision_reason: reason.trim() });
   }
 
   if (auth.loading) return null;
@@ -450,7 +472,7 @@ function AdminDashboard() {
                               Approve
                             </button>
                             <button
-                              onClick={() => updateStatus(r.id, "rejected")}
+                              onClick={() => rejectWithReason(r.id)}
                               disabled={r.status === "rejected"}
                               title="Reject this request"
                               className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded border border-error text-error hover:bg-red-50 disabled:opacity-40"
@@ -529,15 +551,16 @@ function AdminDashboard() {
                     <th className="text-left px-5 py-3 font-medium">Request</th>
                     <th className="text-left px-5 py-3 font-medium">From</th>
                     <th className="text-left px-5 py-3 font-medium">To</th>
+                    <th className="text-left px-5 py-3 font-medium">Reason</th>
                     <th className="text-left px-5 py-3 font-medium">Actor</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant">
                   {auditQuery.isLoading && (
-                    <tr><td colSpan={5} className="text-center py-8 text-on-surface-variant text-sm">Loading…</td></tr>
+                    <tr><td colSpan={6} className="text-center py-8 text-on-surface-variant text-sm">Loading…</td></tr>
                   )}
                   {auditQuery.data?.length === 0 && (
-                    <tr><td colSpan={5} className="text-center py-8 text-on-surface-variant text-sm">No audit entries yet.</td></tr>
+                    <tr><td colSpan={6} className="text-center py-8 text-on-surface-variant text-sm">No audit entries yet.</td></tr>
                   )}
                   {(auditQuery.data ?? []).map((a) => (
                     <tr key={a.id}>
@@ -547,6 +570,9 @@ function AdminDashboard() {
                       <td className="px-5 py-3 font-mono text-xs">#{a.request_id.slice(0, 8).toUpperCase()}</td>
                       <td className="px-5 py-3 capitalize">{a.old_status ?? "—"}</td>
                       <td className="px-5 py-3"><StatusPill status={a.new_status} /></td>
+                      <td className="px-5 py-3 text-xs text-on-surface-variant max-w-[24ch] truncate" title={a.reason ?? ""}>
+                        {a.reason ?? "—"}
+                      </td>
                       <td className="px-5 py-3 font-mono text-xs text-on-surface-variant">
                         {a.actor_id ? a.actor_id.slice(0, 8) : "system"}
                       </td>
@@ -580,6 +606,110 @@ function AdminDashboard() {
               Open full ledger
             </Link>
           </div>
+          {/* Status summary tiles */}
+          {(() => {
+            const summary = ledger.reduce(
+              (acc, l) => {
+                const s = String(l.status ?? "");
+                const amt = Number(l.amount || 0);
+                if (s === "pending") { acc.pending.count++; acc.pending.amount += amt; }
+                else if (s === "approved") { acc.approved.count++; acc.approved.amount += amt; }
+                else if (s === "disbursed") { acc.disbursed.count++; acc.disbursed.amount += amt; }
+                return acc;
+              },
+              {
+                pending: { count: 0, amount: 0 },
+                approved: { count: 0, amount: 0 },
+                disbursed: { count: 0, amount: 0 },
+              },
+            );
+            const tiles: Array<{ key: string; label: string; icon: string; tint: string; data: { count: number; amount: number } }> = [
+              { key: "pending", label: "Pending", icon: "hourglass_top", tint: "bg-secondary-container text-on-secondary-container", data: summary.pending },
+              { key: "approved", label: "Approved (awaiting release)", icon: "verified", tint: "bg-primary-fixed-dim text-primary", data: summary.approved },
+              { key: "disbursed", label: "Disbursed", icon: "paid", tint: "bg-primary text-on-primary", data: summary.disbursed },
+            ];
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-5 border-b border-outline-variant bg-surface-container-low/40">
+                {tiles.map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => setLedgerStatusFilter(t.key)}
+                    className={
+                      "text-left rounded-lg border p-4 hover:bg-surface-container transition-colors " +
+                      (ledgerStatusFilter === t.key
+                        ? "border-primary ring-2 ring-primary/30"
+                        : "border-outline-variant")
+                    }
+                    title={`Filter report to ${t.label}`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs uppercase tracking-wider font-medium text-on-surface-variant">{t.label}</span>
+                      <span className={"w-8 h-8 rounded-md flex items-center justify-center " + t.tint}>
+                        <Icon name={t.icon} fill className="text-[16px]" />
+                      </span>
+                    </div>
+                    <p className="text-xl font-bold text-primary">{t.data.count}</p>
+                    <p className="text-xs text-on-surface-variant mt-0.5">{fmtCompactUGX(t.data.amount)}</p>
+                    <Link
+                      to="/ledger"
+                      className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      View details
+                      <Icon name="arrow_forward" className="text-[12px]" />
+                    </Link>
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+          {/* Filters */}
+          <div className="flex flex-wrap items-end gap-3 p-4 border-b border-outline-variant bg-surface-container-low/30">
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="font-medium text-on-surface-variant">From date</span>
+              <input
+                type="date"
+                value={ledgerFromDate}
+                onChange={(e) => setLedgerFromDate(e.target.value)}
+                className="px-2 py-1.5 border border-outline-variant rounded-md bg-surface-container-low text-sm"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="font-medium text-on-surface-variant">To date</span>
+              <input
+                type="date"
+                value={ledgerToDate}
+                onChange={(e) => setLedgerToDate(e.target.value)}
+                className="px-2 py-1.5 border border-outline-variant rounded-md bg-surface-container-low text-sm"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="font-medium text-on-surface-variant">Status</span>
+              <select
+                value={ledgerStatusFilter}
+                onChange={(e) => setLedgerStatusFilter(e.target.value)}
+                className="px-2 py-1.5 border border-outline-variant rounded-md bg-surface-container-low text-sm"
+              >
+                <option value="all">All</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="disbursed">Disbursed</option>
+              </select>
+            </label>
+            {(ledgerFromDate || ledgerToDate || ledgerStatusFilter !== "all") && (
+              <button
+                onClick={() => {
+                  setLedgerFromDate("");
+                  setLedgerToDate("");
+                  setLedgerStatusFilter("all");
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-outline-variant hover:bg-surface-container"
+              >
+                <Icon name="filter_alt_off" className="text-[14px]" />
+                Clear filters
+              </button>
+            )}
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-surface-container-low text-on-surface-variant text-xs uppercase tracking-wider">
@@ -596,10 +726,22 @@ function AdminDashboard() {
                 {ledgerQuery.isLoading && (
                   <tr><td colSpan={6} className="text-center py-8 text-on-surface-variant text-sm">Loading…</td></tr>
                 )}
-                {!ledgerQuery.isLoading && ledger.length === 0 && (
-                  <tr><td colSpan={6} className="text-center py-8 text-on-surface-variant text-sm">No disbursals recorded yet.</td></tr>
-                )}
-                {ledger.slice(0, 25).map((l) => (
+                {(() => {
+                  const fromTs = ledgerFromDate ? new Date(ledgerFromDate + "T00:00:00").getTime() : null;
+                  const toTs = ledgerToDate ? new Date(ledgerToDate + "T23:59:59").getTime() : null;
+                  const filtered = ledger.filter((l) => {
+                    if (ledgerStatusFilter !== "all" && l.status !== ledgerStatusFilter) return false;
+                    const d = new Date(l.disbursed_at ?? l.created_at).getTime();
+                    if (fromTs !== null && d < fromTs) return false;
+                    if (toTs !== null && d > toTs) return false;
+                    return true;
+                  });
+                  if (!ledgerQuery.isLoading && filtered.length === 0) {
+                    return (
+                      <tr><td colSpan={6} className="text-center py-8 text-on-surface-variant text-sm">No disbursals match the current filters.</td></tr>
+                    );
+                  }
+                  return filtered.slice(0, 50).map((l) => (
                   <tr key={l.id} className="hover:bg-surface-bright">
                     <td className="px-5 py-3 text-on-surface-variant whitespace-nowrap">
                       {new Date(l.disbursed_at ?? l.created_at).toLocaleDateString()}
@@ -612,7 +754,8 @@ function AdminDashboard() {
                     </td>
                     <td className="px-5 py-3"><StatusPill status={l.status} /></td>
                   </tr>
-                ))}
+                  ));
+                })()}
               </tbody>
             </table>
           </div>

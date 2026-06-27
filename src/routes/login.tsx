@@ -126,6 +126,16 @@ function LoginPage() {
   const [resendBusy, setResendBusy] = useState(false);
   const [resendMsg, setResendMsg] = useState<string | null>(null);
   const [lastSignupEmail, setLastSignupEmail] = useState<string>("");
+  // Anti-spam: hard cap + cooldown countdown for the resend confirmation email.
+  const RESEND_COOLDOWN_SECONDS = 60;
+  const RESEND_MAX_ATTEMPTS = 3;
+  const [resendCount, setResendCount] = useState(0);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown((s) => Math.max(0, s - 1)), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
   const [fieldErrors, setFieldErrors] = useState<{
     email?: string;
     password?: string;
@@ -202,6 +212,8 @@ function LoginPage() {
           );
           setLastSignupEmail(parsed.data.email);
           setResendMsg(null);
+          setResendCount(0);
+          setResendCooldown(0);
           setMode("signin");
         }
       } else {
@@ -575,8 +587,19 @@ function LoginPage() {
                       <div className="mt-2 flex items-center gap-2">
                         <button
                           type="button"
-                          disabled={resendBusy}
+                          disabled={
+                            resendBusy ||
+                            resendCooldown > 0 ||
+                            resendCount >= RESEND_MAX_ATTEMPTS
+                          }
                           onClick={async () => {
+                            if (resendCount >= RESEND_MAX_ATTEMPTS) {
+                              setResendMsg(
+                                `Resend limit reached (${RESEND_MAX_ATTEMPTS} attempts). Please contact support if the email still hasn't arrived.`,
+                              );
+                              return;
+                            }
+                            if (resendCooldown > 0) return;
                             setResendBusy(true);
                             setResendMsg(null);
                             const { error } = await supabase.auth.resend({
@@ -587,16 +610,26 @@ function LoginPage() {
                               },
                             });
                             setResendBusy(false);
+                            if (!error) {
+                              setResendCount((c) => c + 1);
+                              setResendCooldown(RESEND_COOLDOWN_SECONDS);
+                            }
                             setResendMsg(
                               error
                                 ? `Could not resend: ${error.message}`
-                                : `Confirmation email resent to ${lastSignupEmail}. Please check your inbox and Spam folder.`,
+                                : `Confirmation email resent to ${lastSignupEmail}. Please check your inbox and Spam folder. (${resendCount + 1}/${RESEND_MAX_ATTEMPTS})`,
                             );
                           }}
                           className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded border border-primary text-primary hover:bg-primary hover:text-on-primary disabled:opacity-50"
                         >
                           <Icon name="forward_to_inbox" className="text-[14px]" />
-                          {resendBusy ? "Resending…" : "Resend confirmation email"}
+                          {resendBusy
+                            ? "Resending…"
+                            : resendCooldown > 0
+                              ? `Resend in ${resendCooldown}s`
+                              : resendCount >= RESEND_MAX_ATTEMPTS
+                                ? "Resend limit reached"
+                                : "Resend confirmation email"}
                         </button>
                         {resendMsg && (
                           <span className="text-xs text-on-surface-variant">{resendMsg}</span>
