@@ -126,6 +126,16 @@ function LoginPage() {
   const [resendBusy, setResendBusy] = useState(false);
   const [resendMsg, setResendMsg] = useState<string | null>(null);
   const [lastSignupEmail, setLastSignupEmail] = useState<string>("");
+  // Anti-spam: hard cap + cooldown countdown for the resend confirmation email.
+  const RESEND_COOLDOWN_SECONDS = 60;
+  const RESEND_MAX_ATTEMPTS = 3;
+  const [resendCount, setResendCount] = useState(0);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown((s) => Math.max(0, s - 1)), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
   const [fieldErrors, setFieldErrors] = useState<{
     email?: string;
     password?: string;
