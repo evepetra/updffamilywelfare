@@ -677,6 +677,8 @@ type ProfileInfo = {
   service: string | null;
   rank: string | null;
   region: string | null;
+  nin: string | null;
+  created_at: string | null;
 } | null;
 
 const RANKS = [
