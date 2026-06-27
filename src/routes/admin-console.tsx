@@ -64,6 +64,9 @@ function AdminConsole() {
   // System Administrators have oversight but cannot disburse aid — only
   // Administrators move money out of the welfare account.
   const canDisburse = auth.isAdmin;
+  const viewOnlyDisbursals = auth.isSystemAdmin && !auth.isAdmin;
+  const disburseLockTooltip =
+    "Locked for System Administrators. Only Administrators can release funds; system_admin disbursal writes are blocked at the database level (RLS).";
   const [search, setSearch] = useState("");
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -366,6 +369,19 @@ function AdminConsole() {
             {disbursalsQuery.data?.length ?? 0} awaiting
           </span>
         </div>
+        {viewOnlyDisbursals && (
+          <div
+            role="status"
+            className="px-5 py-3 bg-primary-fixed-dim/60 border-b border-primary/30 text-xs flex items-start gap-2"
+          >
+            <Icon name="visibility" fill className="text-[16px] text-primary mt-0.5" />
+            <p>
+              <span className="font-semibold text-primary">View-only oversight: </span>
+              You're signed in as System Administrator. Disburse is disabled and blocked at the
+              database level — only Administrators can release funds.
+            </p>
+          </div>
+        )}
         {disbursalError && (
           <div className="px-5 py-2 text-xs text-error bg-error-container/40 border-b border-error/30">
             {disbursalError}
@@ -422,19 +438,23 @@ function AdminConsole() {
                         <button
                           disabled={!hasAcc || disbursingId === row.id}
                           onClick={() => disburse(row)}
+                          title={!hasAcc ? "Recipient has no deposit account on file" : "Release funds to recipient"}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded bg-primary text-on-primary hover:bg-primary-container disabled:opacity-40"
                         >
                           <Icon name="send_money" className="text-[14px]" />
                           {disbursingId === row.id ? "Disbursing…" : "Disburse"}
                         </button>
                       ) : (
-                        <span
-                          title="System Administrators have oversight only; disbursals are performed by Administrators."
-                          className="inline-flex items-center gap-1 text-xs text-on-surface-variant"
+                        <button
+                          type="button"
+                          disabled
+                          title={disburseLockTooltip}
+                          aria-label={"Disburse disabled. " + disburseLockTooltip}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded bg-primary text-on-primary opacity-40 cursor-not-allowed"
                         >
-                          <Icon name="visibility" className="text-[14px]" />
-                          View only
-                        </span>
+                          <Icon name="lock" className="text-[14px]" />
+                          Disburse
+                        </button>
                       )}
                     </td>
                   </tr>
