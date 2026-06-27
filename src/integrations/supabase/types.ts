@@ -158,6 +158,10 @@ export type Database = {
         Row: {
           army_number: string | null
           created_at: string
+          family_member_full_name: string | null
+          family_member_nin: string | null
+          family_member_region: string | null
+          family_member_relationship: string | null
           full_name: string | null
           id: string
           nin: string | null
@@ -179,6 +183,10 @@ export type Database = {
         Insert: {
           army_number?: string | null
           created_at?: string
+          family_member_full_name?: string | null
+          family_member_nin?: string | null
+          family_member_region?: string | null
+          family_member_relationship?: string | null
           full_name?: string | null
           id: string
           nin?: string | null
@@ -200,6 +208,10 @@ export type Database = {
         Update: {
           army_number?: string | null
           created_at?: string
+          family_member_full_name?: string | null
+          family_member_nin?: string | null
+          family_member_region?: string | null
+          family_member_relationship?: string | null
           full_name?: string | null
           id?: string
           nin?: string | null
