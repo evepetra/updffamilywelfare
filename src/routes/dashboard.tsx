@@ -346,7 +346,6 @@ function PayoutAccountCard({
   const [accNum, setAccNum] = useState<string>(initial?.payout_account_number ?? "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [regionErr, setRegionErr] = useState<string | null>(null);
 
   useEffect(() => {
     setMethod(initial?.payout_method ?? "bank");
@@ -504,7 +503,6 @@ function SoldierRelationshipCard({ userId }: { userId: string }) {
   const [svc, setSvc] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [regionErr, setRegionErr] = useState<string | null>(null);
 
   useEffect(() => {
     setRel(initial?.relationship_to_soldier ?? "");
@@ -717,6 +715,7 @@ function ProfileDetailsCard({
   const [snapshot, setSnapshot] = useState<ProfileInfo>(initial);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [regionErr, setRegionErr] = useState<string | null>(null);
 
   useEffect(() => {
     setSnapshot(initial);
