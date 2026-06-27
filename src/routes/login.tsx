@@ -122,6 +122,7 @@ function LoginPage() {
   const [rank, setRank] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [signupNotice, setSignupNotice] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{
     email?: string;
     password?: string;
@@ -142,6 +143,7 @@ function LoginPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setSignupNotice(null);
     setFieldErrors({});
     setLoading(true);
     try {
@@ -185,7 +187,18 @@ function LoginPage() {
           },
         });
         if (error) throw error;
-        navigate({ to: "/dashboard" });
+        // If email confirmation is enabled, no session is returned. Show a
+        // clear notice so members know to check spam if the email doesn't
+        // appear in their inbox.
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData.session) {
+          navigate({ to: "/dashboard" });
+        } else {
+          setSignupNotice(
+            `Account created. We've sent a confirmation email to ${parsed.data.email}. If you don't see it in your inbox within a few minutes, please check your Spam or Junk folder.`,
+          );
+          setMode("signin");
+        }
       } else {
         const parsed = signInSchema.safeParse({ email, password });
         if (!parsed.success) {
@@ -542,6 +555,16 @@ function LoginPage() {
               {error && (
                 <div className="text-sm text-error bg-error-container/40 border border-error/30 rounded-md px-3 py-2">
                   {error}
+                </div>
+              )}
+
+              {signupNotice && (
+                <div
+                  role="status"
+                  className="text-sm text-primary bg-primary-fixed-dim/60 border border-primary/30 rounded-md px-3 py-2 flex gap-2"
+                >
+                  <Icon name="mark_email_read" className="text-[18px] mt-0.5" />
+                  <span>{signupNotice}</span>
                 </div>
               )}
 

@@ -99,7 +99,11 @@ function AdminDashboard() {
   const [page, setPage] = useState(1);
   const pageSize = 10;
   const [auditOpen, setAuditOpen] = useState(false);
-  const isStaff = auth.isOfficer || auth.isAdmin;
+  // System Administrators may VIEW the Welfare Officer console for oversight,
+  // but they cannot approve, reject, or disburse aid — only officers/admins
+  // can take action on requests.
+  const isStaff = auth.isOfficer || auth.isAdmin || auth.isSystemAdmin;
+  const canActOnRequests = auth.isOfficer || auth.isAdmin;
 
   const requestsQuery = useQuery({
     queryKey: ["admin-requests"],
@@ -414,22 +418,34 @@ function AdminDashboard() {
                     </td>
                     <td className="px-5 py-4 text-right">
                       <div className="inline-flex items-center gap-1.5 justify-end">
-                        <button
-                          onClick={() => approveWithAmount(r.id)}
-                          disabled={r.status === "approved" || r.status === "completed"}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded bg-primary text-on-primary hover:bg-primary-container disabled:opacity-40"
-                        >
-                          <Icon name="check" className="text-[14px]" />
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => updateStatus(r.id, "rejected")}
-                          disabled={r.status === "rejected"}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded border border-error text-error hover:bg-red-50 disabled:opacity-40"
-                        >
-                          <Icon name="close" className="text-[14px]" />
-                          Reject
-                        </button>
+                        {canActOnRequests ? (
+                          <>
+                            <button
+                              onClick={() => approveWithAmount(r.id)}
+                              disabled={r.status === "approved" || r.status === "completed"}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded bg-primary text-on-primary hover:bg-primary-container disabled:opacity-40"
+                            >
+                              <Icon name="check" className="text-[14px]" />
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => updateStatus(r.id, "rejected")}
+                              disabled={r.status === "rejected"}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded border border-error text-error hover:bg-red-50 disabled:opacity-40"
+                            >
+                              <Icon name="close" className="text-[14px]" />
+                              Reject
+                            </button>
+                          </>
+                        ) : (
+                          <span
+                            title="System Administrators have view-only oversight; approvals are performed by welfare officers."
+                            className="inline-flex items-center gap-1 text-xs text-on-surface-variant"
+                          >
+                            <Icon name="visibility" className="text-[14px]" />
+                            View only
+                          </span>
+                        )}
                       </div>
                     </td>
                   </tr>
