@@ -786,6 +786,7 @@ function AdminDashboard() {
                   <th className="text-left px-5 py-3 font-medium">Date</th>
                   <th className="text-left px-5 py-3 font-medium">Recipient</th>
                   <th className="text-left px-5 py-3 font-medium">Region</th>
+                  <th className="text-left px-5 py-3 font-medium">UPDF Service</th>
                   <th className="text-left px-5 py-3 font-medium">Aid Type</th>
                   <th className="text-left px-5 py-3 font-medium">Deposit Account</th>
                   <th className="text-right px-5 py-3 font-medium">Amount (UGX)</th>
@@ -794,13 +795,17 @@ function AdminDashboard() {
               </thead>
               <tbody className="divide-y divide-outline-variant">
                 {ledgerQuery.isLoading && (
-                  <tr><td colSpan={7} className="text-center py-8 text-on-surface-variant text-sm">Loading…</td></tr>
+                  <tr><td colSpan={8} className="text-center py-8 text-on-surface-variant text-sm">Loading…</td></tr>
                 )}
                 {(() => {
                   const fromTs = ledgerFromDate ? new Date(ledgerFromDate + "T00:00:00").getTime() : null;
                   const toTs = ledgerToDate ? new Date(ledgerToDate + "T23:59:59").getTime() : null;
                   const filtered = ledger.filter((l) => {
                     if (ledgerStatusFilter !== "all" && l.status !== ledgerStatusFilter) return false;
+                    if (serviceFilter !== "all") {
+                      const svc = serviceByUserId.get(l.recipient_user_id) ?? "";
+                      if (svc !== serviceFilter) return false;
+                    }
                     const d = new Date(l.disbursed_at ?? l.created_at).getTime();
                     if (fromTs !== null && d < fromTs) return false;
                     if (toTs !== null && d > toTs) return false;
@@ -808,7 +813,7 @@ function AdminDashboard() {
                   });
                   if (!ledgerQuery.isLoading && filtered.length === 0) {
                     return (
-                      <tr><td colSpan={7} className="text-center py-8 text-on-surface-variant text-sm">No disbursals match the current filters.</td></tr>
+                      <tr><td colSpan={8} className="text-center py-8 text-on-surface-variant text-sm">No disbursals match the current filters.</td></tr>
                     );
                   }
                   return filtered.slice(0, 50).map((l) => (
@@ -818,6 +823,19 @@ function AdminDashboard() {
                     </td>
                     <td className="px-5 py-3 font-medium">{l.recipient_name}</td>
                     <td className="px-5 py-3">{l.region}</td>
+                    <td className="px-5 py-3 text-xs">
+                      {(() => {
+                        const svc = serviceByUserId.get(l.recipient_user_id);
+                        return svc ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-fixed-dim text-primary font-medium">
+                            <Icon name="military_tech" className="text-[12px]" />
+                            {svc}
+                          </span>
+                        ) : (
+                          <span className="text-on-surface-variant">—</span>
+                        );
+                      })()}
+                    </td>
                     <td className="px-5 py-3">{l.aid_type}</td>
                     <td className="px-5 py-3 text-xs">
                       {l.payout_account_number ? (
