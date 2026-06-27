@@ -6,6 +6,12 @@ import { Icon } from "@/components/Icon";
 import { supabase } from "@/integrations/supabase/client";
 import { adminListUsers, requireAdmin } from "@/lib/auth/roles.functions";
 import { useAuth } from "@/hooks/use-auth";
+import {
+  buildMembersCsv,
+  buildDisbursementsCsv,
+  downloadCsv,
+  filterAndSortMembers,
+} from "@/lib/admin/service-filters";
 
 type AppRole = "family" | "soldier" | "officer" | "admin" | "system_admin";
 const ROLE_LABEL: Record<AppRole, string> = {
@@ -214,30 +220,16 @@ function AdminConsole() {
   });
 
   const users = usersQuery.data ?? [];
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const matched = users.filter((u) => {
-      if (serviceFilter !== "all" && (u.service ?? "") !== serviceFilter) return false;
-      if (!q) return true;
-      return (
-        (u.email ?? "").toLowerCase().includes(q) ||
-        (u.full_name ?? "").toLowerCase().includes(q) ||
-        (u.service_number ?? "").toLowerCase().includes(q) ||
-        (u.service ?? "").toLowerCase().includes(q)
-      );
-    });
-    const sorted = [...matched].sort((a, b) => {
-      const dir = sortDir === "asc" ? 1 : -1;
-      if (sortBy === "service") {
-        return ((a.service ?? "").localeCompare(b.service ?? "")) * dir;
-      }
-      if (sortBy === "full_name") {
-        return ((a.full_name ?? "").localeCompare(b.full_name ?? "")) * dir;
-      }
-      return (a.created_at < b.created_at ? 1 : -1) * dir;
-    });
-    return sorted;
-  }, [users, search, serviceFilter, sortBy, sortDir]);
+  const filtered = useMemo(
+    () =>
+      filterAndSortMembers(users, {
+        search,
+        serviceFilter: serviceFilter as "all" | string as never,
+        sortBy,
+        sortDir,
+      }),
+    [users, search, serviceFilter, sortBy, sortDir],
+  );
 
   function toggleSort(col: "created_at" | "service" | "full_name") {
     if (sortBy === col) {
@@ -291,6 +283,48 @@ function AdminConsole() {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  }
+
+  function exportMembersCsv() {
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    downloadCsv(
+      `updf-members-${ts}.csv`,
+      buildMembersCsv(
+        filtered.map((u) => ({
+          id: u.id,
+          email: u.email,
+          full_name: u.full_name,
+          service_number: u.service_number,
+          service: u.service,
+          roles: u.roles ?? [],
+          created_at: u.created_at,
+        })),
+      ),
+    );
+  }
+
+  function exportPendingDisbursalsCsv() {
+    const rows = disbursalsQuery.data ?? [];
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    downloadCsv(
+      `pending-disbursals-${ts}.csv`,
+      buildDisbursementsCsv(
+        rows.map((r) => ({
+          id: r.id,
+          date: r.updated_at,
+          recipient_name: r.profiles?.full_name ?? null,
+          region: null,
+          service: r.profiles?.service ?? null,
+          aid_type: r.request_type,
+          payout_method: r.profiles?.payout_method ?? null,
+          payout_provider: r.profiles?.payout_provider ?? null,
+          payout_account_name: r.profiles?.payout_account_name ?? null,
+          payout_account_number: r.profiles?.payout_account_number ?? null,
+          amount: r.amount_approved ?? "",
+          status: "approved",
+        })),
+      ),
+    );
   }
 
   const sysAdmins = users.filter((u) => u.roles?.includes("system_admin")).length;
@@ -402,9 +436,21 @@ function AdminConsole() {
               Requests approved by welfare officers. Only administrators can release funds to recipient accounts.
             </p>
           </div>
-          <span className="text-xs px-2.5 py-1 rounded-full bg-primary text-on-primary font-semibold">
-            {disbursalsQuery.data?.length ?? 0} awaiting
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={exportPendingDisbursalsCsv}
+              disabled={!disbursalsQuery.data?.length}
+              className="text-xs px-2.5 py-1 rounded border border-primary text-primary hover:bg-primary hover:text-on-primary disabled:opacity-40"
+              title="Export pending disbursals to CSV (includes UPDF Service)"
+            >
+              <Icon name="download" className="text-[14px] mr-1 align-middle" />
+              CSV
+            </button>
+            <span className="text-xs px-2.5 py-1 rounded-full bg-primary text-on-primary font-semibold">
+              {disbursalsQuery.data?.length ?? 0} awaiting
+            </span>
+          </div>
         </div>
         {viewOnlyDisbursals && (
           <div
@@ -540,6 +586,16 @@ function AdminConsole() {
               ))}
               <option value="">— Unassigned —</option>
             </select>
+            <button
+              type="button"
+              onClick={exportMembersCsv}
+              disabled={filtered.length === 0}
+              title="Export filtered members to CSV (includes UPDF Service)"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-md border border-primary text-primary hover:bg-primary hover:text-on-primary disabled:opacity-40"
+            >
+              <Icon name="download" className="text-[14px]" />
+              Export CSV
+            </button>
           </div>
 
           {selected.size > 0 && (
