@@ -514,9 +514,21 @@ function AdminConsole() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search name, email or service #"
+              placeholder="Search name, email, service # or UPDF service"
               className="px-3 py-2 text-sm bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary w-full md:w-64"
             />
+            <select
+              value={serviceFilter}
+              onChange={(e) => setServiceFilter(e.target.value)}
+              title="Filter by UPDF Service"
+              className="px-3 py-2 text-sm bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary"
+            >
+              <option value="all">All services</option>
+              {UPDF_SERVICES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+              <option value="">— Unassigned —</option>
+            </select>
           </div>
 
           {selected.size > 0 && (
