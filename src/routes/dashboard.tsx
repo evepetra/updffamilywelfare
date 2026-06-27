@@ -809,19 +809,21 @@ function ProfileDetailsCard({
               className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
             />
           </label>
-          <label className="text-xs">
-            <span className="block mb-1 text-on-surface-variant">Rank</span>
-            <select
-              value={rank}
-              onChange={(e) => setRank(e.target.value)}
-              className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
-            >
-              <option value="">—</option>
-              {RANKS.map((r) => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
-          </label>
+          {isSoldier && (
+            <label className="text-xs">
+              <span className="block mb-1 text-on-surface-variant">Rank</span>
+              <select
+                value={rank}
+                onChange={(e) => setRank(e.target.value)}
+                className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+              >
+                <option value="">—</option>
+                {RANKS.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="text-xs">
             <span className="block mb-1 text-on-surface-variant">Region</span>
             <select
