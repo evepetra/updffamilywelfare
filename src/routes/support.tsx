@@ -326,6 +326,79 @@ function SupportPage() {
 
           {step === 2 && (
             <>
+              <h2 className="text-xl font-semibold text-primary mb-1">Financial Aid Request</h2>
+              <p className="text-sm text-on-surface-variant mb-6">
+                Specify the amount you are requesting and how it should be paid out.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-on-surface mb-1.5">
+                    Requested Amount (UGX)
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    step={1000}
+                    value={requestedAmount}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setRequestedAmount(v);
+                      const n = v === "" ? null : Number(v);
+                      if (n !== null && paymentMethod === "mobile_money" && n > MOBILE_MONEY_MAX_UGX) {
+                        setAmountError("Maximum request amount for Mobile Money transfers is 7,000,000 UGX.");
+                      } else {
+                        setAmountError(null);
+                      }
+                    }}
+                    placeholder="e.g. 500000"
+                    aria-invalid={!!amountError}
+                    className={
+                      "w-full px-4 py-3 bg-surface-container-low border rounded-md focus:outline-none text-sm " +
+                      (amountError ? "border-error focus:border-error" : "border-outline-variant focus:border-primary")
+                    }
+                  />
+                  {amountError ? (
+                    <p className="mt-1.5 text-xs text-error">{amountError}</p>
+                  ) : (
+                    requestedAmount && (
+                      <p className="mt-1.5 text-xs text-on-surface-variant">
+                        {Number(requestedAmount).toLocaleString("en-UG")} UGX
+                      </p>
+                    )
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-on-surface mb-1.5">
+                    Payment Method
+                  </label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => {
+                      const v = e.target.value as "mobile_money" | "bank_transfer";
+                      setPaymentMethod(v);
+                      const n = requestedAmount ? Number(requestedAmount) : null;
+                      if (v === "mobile_money" && n !== null && n > MOBILE_MONEY_MAX_UGX) {
+                        setAmountError("Maximum request amount for Mobile Money transfers is 7,000,000 UGX.");
+                      } else {
+                        setAmountError(null);
+                      }
+                    }}
+                    className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant rounded-md focus:outline-none focus:border-primary text-sm"
+                  >
+                    <option value="mobile_money">Mobile Money</option>
+                    <option value="bank_transfer">Bank Transfer</option>
+                  </select>
+                  <p className="mt-1.5 text-xs text-on-surface-variant">
+                    Mobile Money payouts are limited to 7,000,000 UGX per request.
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
+
+          {step === 3 && (
+            <>
               <h2 className="text-xl font-semibold text-primary mb-1">
                 Supporting Documents
               </h2>
@@ -391,7 +464,7 @@ function SupportPage() {
             </>
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <>
               <h2 className="text-xl font-semibold text-primary mb-1">
                 Review & Submit
