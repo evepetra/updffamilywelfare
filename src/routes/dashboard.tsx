@@ -702,6 +702,7 @@ function ProfileDetailsCard({
 }: {
   userId: string;
   isSoldier: boolean;
+  email: string | undefined;
   initial: ProfileInfo;
   onSaved: () => void;
 }) {
