@@ -102,6 +102,8 @@ function AdminDashboard() {
   const [ledgerFromDate, setLedgerFromDate] = useState("");
   const [ledgerToDate, setLedgerToDate] = useState("");
   const [ledgerStatusFilter, setLedgerStatusFilter] = useState<string>("all");
+  const [serviceFilter, setServiceFilter] = useState<string>("all");
+  const UPDF_SERVICES = ["Air Force", "SFC", "Land Force", "Reserve Force"] as const;
   // System Administrators may VIEW the Welfare Officer console for oversight,
   // but they cannot approve, reject, or disburse aid — only officers/admins
   // can take action on requests.
@@ -140,10 +142,38 @@ function AdminDashboard() {
   const requests = requestsQuery.data ?? [];
   const ledger = ledgerQuery.data ?? [];
 
+  // Build a map of user_id -> UPDF service for segmenting requests + ledger by service.
+  const requesterIds = useMemo(() => {
+    const ids = new Set<string>();
+    requests.forEach((r) => r.user_id && ids.add(r.user_id));
+    ledger.forEach((l) => l.recipient_user_id && ids.add(l.recipient_user_id));
+    return Array.from(ids);
+  }, [requests, ledger]);
+
+  const servicesQuery = useQuery({
+    queryKey: ["admin-user-services", requesterIds.join(",")],
+    enabled: isStaff && requesterIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, service")
+        .in("id", requesterIds);
+      if (error) throw error;
+      const m = new Map<string, string | null>();
+      (data ?? []).forEach((p) => m.set(p.id, p.service ?? null));
+      return m;
+    },
+  });
+  const serviceByUserId = servicesQuery.data ?? new Map<string, string | null>();
+
   const filteredRequests = useMemo(() => {
     const q = search.trim().toLowerCase();
     return requests.filter((r) => {
       if (pendingOnly && r.status !== "pending" && r.status !== "verifying") return false;
+      if (serviceFilter !== "all") {
+        const svc = serviceByUserId.get(r.user_id) ?? "";
+        if (svc !== serviceFilter) return false;
+      }
       if (!q) return true;
       return (
         (r.title ?? "").toLowerCase().includes(q) ||
@@ -151,7 +181,7 @@ function AdminDashboard() {
         r.id.toLowerCase().includes(q)
       );
     });
-  }, [requests, pendingOnly, search]);
+  }, [requests, pendingOnly, search, serviceFilter, serviceByUserId]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRequests.length / pageSize));
   const currentPage = Math.min(page, totalPages);
