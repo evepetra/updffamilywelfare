@@ -526,12 +526,12 @@ function ProfileDetailsCard({
     if (!userId) return;
     setBusy(true);
     setErr(null);
-    const payload: Record<string, string | null> = {
+    const payload = {
       full_name: fullName.trim() || null,
       rank: rank.trim() || null,
       region: region.trim() || null,
+      ...(isSoldier ? { service: service.trim() || null } : {}),
     };
-    if (isSoldier) payload.service = service.trim() || null;
     const { error } = await supabase.from("profiles").update(payload).eq("id", userId);
     setBusy(false);
     if (error) {
@@ -541,7 +541,7 @@ function ProfileDetailsCard({
     setSnapshot({
       full_name: payload.full_name,
       service_number: snapshot?.service_number ?? null,
-      service: isSoldier ? payload.service ?? null : snapshot?.service ?? null,
+      service: isSoldier ? service.trim() || null : snapshot?.service ?? null,
       rank: payload.rank,
       region: payload.region,
     });
