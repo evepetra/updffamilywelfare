@@ -30,9 +30,12 @@ export const Route = createFileRoute("/support")({
 const STEPS = [
   { label: "Request Type", icon: "category" },
   { label: "Family Details", icon: "family_restroom" },
+  { label: "Financial Aid", icon: "payments" },
   { label: "Documents", icon: "upload_file" },
   { label: "Review & Submit", icon: "task_alt" },
 ];
+
+const MOBILE_MONEY_MAX_UGX = 7_000_000;
 
 function SupportPage() {
   const navigate = useNavigate();
@@ -43,6 +46,9 @@ function SupportPage() {
   const [notify, setNotify] = useState({ sms: true, email: true, app: true });
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
+  const [requestedAmount, setRequestedAmount] = useState<string>("");
+  const [paymentMethod, setPaymentMethod] = useState<"mobile_money" | "bank_transfer">("mobile_money");
+  const [amountError, setAmountError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
@@ -86,6 +92,15 @@ function SupportPage() {
 
   async function submit() {
     if (!user) return;
+    const amt = requestedAmount ? Number(requestedAmount) : null;
+    if (amt !== null && (!Number.isFinite(amt) || amt < 0)) {
+      setError("Enter a valid requested amount in UGX.");
+      return;
+    }
+    if (paymentMethod === "mobile_money" && amt !== null && amt > MOBILE_MONEY_MAX_UGX) {
+      setError("Maximum request amount for Mobile Money transfers is 7,000,000 UGX.");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     const { data: inserted, error: insertErr } = await supabase
@@ -97,6 +112,8 @@ function SupportPage() {
       title: title.trim() || `${requestType} request`,
       details: details.trim() || null,
       status: "pending",
+      requested_amount: amt,
+      payment_method: paymentMethod,
       })
       .select("id")
       .single();
