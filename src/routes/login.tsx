@@ -587,8 +587,19 @@ function LoginPage() {
                       <div className="mt-2 flex items-center gap-2">
                         <button
                           type="button"
-                          disabled={resendBusy}
+                          disabled={
+                            resendBusy ||
+                            resendCooldown > 0 ||
+                            resendCount >= RESEND_MAX_ATTEMPTS
+                          }
                           onClick={async () => {
+                            if (resendCount >= RESEND_MAX_ATTEMPTS) {
+                              setResendMsg(
+                                `Resend limit reached (${RESEND_MAX_ATTEMPTS} attempts). Please contact support if the email still hasn't arrived.`,
+                              );
+                              return;
+                            }
+                            if (resendCooldown > 0) return;
                             setResendBusy(true);
                             setResendMsg(null);
                             const { error } = await supabase.auth.resend({
@@ -599,16 +610,26 @@ function LoginPage() {
                               },
                             });
                             setResendBusy(false);
+                            if (!error) {
+                              setResendCount((c) => c + 1);
+                              setResendCooldown(RESEND_COOLDOWN_SECONDS);
+                            }
                             setResendMsg(
                               error
                                 ? `Could not resend: ${error.message}`
-                                : `Confirmation email resent to ${lastSignupEmail}. Please check your inbox and Spam folder.`,
+                                : `Confirmation email resent to ${lastSignupEmail}. Please check your inbox and Spam folder. (${resendCount + 1}/${RESEND_MAX_ATTEMPTS})`,
                             );
                           }}
                           className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded border border-primary text-primary hover:bg-primary hover:text-on-primary disabled:opacity-50"
                         >
                           <Icon name="forward_to_inbox" className="text-[14px]" />
-                          {resendBusy ? "Resending…" : "Resend confirmation email"}
+                          {resendBusy
+                            ? "Resending…"
+                            : resendCooldown > 0
+                              ? `Resend in ${resendCooldown}s`
+                              : resendCount >= RESEND_MAX_ATTEMPTS
+                                ? "Resend limit reached"
+                                : "Resend confirmation email"}
                         </button>
                         {resendMsg && (
                           <span className="text-xs text-on-surface-variant">{resendMsg}</span>
