@@ -729,9 +729,8 @@ function ProfileDetailsCard({
     setErr(null);
     const payload = {
       full_name: fullName.trim() || null,
-      rank: rank.trim() || null,
       region: region.trim() || null,
-      ...(isSoldier ? { service: service.trim() || null } : {}),
+      ...(isSoldier ? { rank: rank.trim() || null, service: service.trim() || null } : {}),
     };
     const { error } = await supabase.from("profiles").update(payload).eq("id", userId);
     setBusy(false);
