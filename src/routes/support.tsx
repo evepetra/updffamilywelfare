@@ -30,7 +30,7 @@ export const Route = createFileRoute("/support")({
 const STEPS = [
   { label: "Request Type", icon: "category" },
   { label: "Family Details", icon: "family_restroom" },
-  { label: "Financial Aid", icon: "payments" },
+  { label: "Enter Amount", icon: "payments" },
   { label: "Documents", icon: "upload_file" },
   { label: "Review & Submit", icon: "task_alt" },
 ];
@@ -39,7 +39,7 @@ const MOBILE_MONEY_MAX_UGX = 7_000_000;
 
 function SupportPage() {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user, profile, isSoldier } = useAuth();
   const [step, setStep] = useState(0);
   const [requestType, setRequestType] = useState("Medical Aid");
   const [urgency, setUrgency] = useState<"Routine" | "Urgent" | "Emergency">("Routine");
@@ -295,9 +295,18 @@ function SupportPage() {
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <ReadOnly label="Family Head" value={profile?.full_name || "—"} />
-                <ReadOnly label="Service Number" value={profile?.service_number || "—"} />
-                <ReadOnly label="Account Email" value={user?.email || "—"} />
-                <ReadOnly label="Account ID" value={(user?.id || "").slice(0, 8).toUpperCase()} />
+                {isSoldier ? (
+                  <>
+                    <ReadOnly label="Service Number" value={profile?.service_number || "—"} />
+                    <ReadOnly label="Account Email" value={user?.email || "—"} />
+                    <ReadOnly label="Account ID" value={(user?.id || "").slice(0, 8).toUpperCase()} />
+                  </>
+                ) : (
+                  <>
+                    <ReadOnly label="Email" value={user?.email || "—"} />
+                    <ReadOnly label="National ID (NIN)" value={profile?.nin || "—"} />
+                  </>
+                )}
               </div>
               <div className="mt-6">
                 <label className="block text-sm font-medium text-on-surface mb-1.5">
