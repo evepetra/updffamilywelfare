@@ -15,6 +15,7 @@ export interface AuthState {
     service: string | null;
     rank: string | null;
     region: string | null;
+    nin: string | null;
   } | null;
   roles: Role[];
   isFamily: boolean;
@@ -41,7 +42,7 @@ export function useAuth(redirectIfUnauthed = true): AuthState {
       const [{ data: prof }, { data: rs }] = await Promise.all([
         supabase
           .from("profiles")
-          .select("full_name, service_number, service, rank, region")
+        .select("full_name, service_number, service, rank, region, nin")
           .eq("id", uid)
           .maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", uid),
