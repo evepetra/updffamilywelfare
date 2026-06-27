@@ -449,9 +449,21 @@ function AdminConsole() {
               Requests approved by welfare officers. Only administrators can release funds to recipient accounts.
             </p>
           </div>
-          <span className="text-xs px-2.5 py-1 rounded-full bg-primary text-on-primary font-semibold">
-            {disbursalsQuery.data?.length ?? 0} awaiting
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={exportPendingDisbursalsCsv}
+              disabled={!disbursalsQuery.data?.length}
+              className="text-xs px-2.5 py-1 rounded border border-primary text-primary hover:bg-primary hover:text-on-primary disabled:opacity-40"
+              title="Export pending disbursals to CSV (includes UPDF Service)"
+            >
+              <Icon name="download" className="text-[14px] mr-1 align-middle" />
+              CSV
+            </button>
+            <span className="text-xs px-2.5 py-1 rounded-full bg-primary text-on-primary font-semibold">
+              {disbursalsQuery.data?.length ?? 0} awaiting
+            </span>
+          </div>
         </div>
         {viewOnlyDisbursals && (
           <div
