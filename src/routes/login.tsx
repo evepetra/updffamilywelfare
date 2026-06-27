@@ -58,6 +58,15 @@ const UPDF_RANKS = [
   "General",
 ] as const;
 
+// UPDF service regions (also constrained on profiles.region in the database)
+const UPDF_REGIONS = [
+  "Central",
+  "Western",
+  "Northern",
+  "Eastern",
+  "West Nile",
+] as const;
+
 const signInSchema = z.object({
   email: z
     .string()
@@ -82,6 +91,12 @@ const baseSignUpSchema = signInSchema.extend({
     .toUpperCase()
     .regex(NIN_REGEX, {
       message: "Enter a valid 14-character National ID (e.g. CM12345678ABCD)",
+    }),
+  region: z
+    .string()
+    .trim()
+    .refine((v) => (UPDF_REGIONS as readonly string[]).includes(v), {
+      message: "Select your region",
     }),
 });
 
@@ -120,6 +135,7 @@ function LoginPage() {
   const [nin, setNin] = useState("");
   const [armyNumber, setArmyNumber] = useState("");
   const [rank, setRank] = useState<string>("");
+  const [region, setRegion] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signupNotice, setSignupNotice] = useState<string | null>(null);
@@ -143,6 +159,7 @@ function LoginPage() {
     nin?: string;
     armyNumber?: string;
     rank?: string;
+    region?: string;
   }>({});
 
   useEffect(() => {
@@ -165,8 +182,8 @@ function LoginPage() {
         const schema = role === "soldier" ? soldierSignUpSchema : familySignUpSchema;
         const parsed = schema.safeParse(
           role === "soldier"
-            ? { email, password, fullName, nin, armyNumber, rank }
-            : { email, password, fullName, nin },
+            ? { email, password, fullName, nin, region, armyNumber, rank }
+            : { email, password, fullName, nin, region },
         );
         if (!parsed.success) {
           const fe: typeof fieldErrors = {};
@@ -192,6 +209,7 @@ function LoginPage() {
             data: {
               full_name: parsed.data.fullName,
               nin: ninCheck.nin,
+              region: parsed.data.region,
               signup_role: role,
               ...(role === "soldier"
                 ? { army_number: army, service_number: army, rank }
@@ -461,6 +479,41 @@ function LoginPage() {
                     ) : (
                       <p className="mt-1.5 text-xs text-on-surface-variant">
                         14-character Ugandan NIN starting with <span className="font-medium">CM</span> or <span className="font-medium">CF</span>.
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-on-surface mb-1.5">
+                      Region
+                    </label>
+                    <div className="relative">
+                      <Icon
+                        name="public"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]"
+                      />
+                      <select
+                        required
+                        value={region}
+                        onChange={(e) => setRegion(e.target.value)}
+                        aria-invalid={!!fieldErrors.region}
+                        className={
+                          "w-full pl-10 pr-4 py-3 bg-surface-container-low border rounded-md focus:outline-none text-sm appearance-none " +
+                          (fieldErrors.region
+                            ? "border-error focus:border-error"
+                            : "border-outline-variant focus:border-primary")
+                        }
+                      >
+                        <option value="">Select your region…</option>
+                        {(["Central","Western","Northern","Eastern","West Nile"] as const).map((r) => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {fieldErrors.region ? (
+                      <p className="mt-1.5 text-xs text-error">{fieldErrors.region}</p>
+                    ) : (
+                      <p className="mt-1.5 text-xs text-on-surface-variant">
+                        Pick the UPDF service region you belong to. Used for regional aid reporting.
                       </p>
                     )}
                   </div>

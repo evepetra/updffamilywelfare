@@ -77,9 +77,9 @@ function LedgerPage() {
   const total = rows.reduce((acc, r) => acc + Number(r.amount || 0), 0);
 
   function exportCsv() {
-    const header = ["id", "recipient", "type", "region", "date", "amount", "status"];
+    const header = ["id", "recipient", "type", "region", "deposit_method", "deposit_provider", "deposit_account_name", "deposit_account_number", "date", "amount", "status"];
     const lines = rows.map((r) =>
-      [r.id, r.recipient_name, r.aid_type, r.region, r.created_at, r.amount, r.status]
+      [r.id, r.recipient_name, r.aid_type, r.region, r.payout_method, r.payout_provider, r.payout_account_name, r.payout_account_number, r.created_at, r.amount, r.status]
         .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`)
         .join(","),
     );
@@ -150,6 +150,7 @@ function LedgerPage() {
                 <th className="text-left px-5 py-3 font-medium">Recipient</th>
                 <th className="text-left px-5 py-3 font-medium">Type</th>
                 <th className="text-left px-5 py-3 font-medium">Region</th>
+                <th className="text-left px-5 py-3 font-medium">Deposit Account</th>
                 <th className="text-left px-5 py-3 font-medium">Date</th>
                 <th className="text-right px-5 py-3 font-medium">Amount</th>
                 <th className="text-left px-5 py-3 font-medium">Status</th>
@@ -162,6 +163,22 @@ function LedgerPage() {
                   <td className="px-5 py-3">{r.recipient_name}</td>
                   <td className="px-5 py-3">{r.aid_type}</td>
                   <td className="px-5 py-3">{r.region}</td>
+                  <td className="px-5 py-3 text-xs">
+                    {r.payout_account_number ? (
+                      <>
+                        <div className="font-medium capitalize">
+                          {(r.payout_method === "mobile_money" ? "Mobile Money" : "Bank")}
+                          {r.payout_provider ? ` · ${r.payout_provider}` : ""}
+                        </div>
+                        <div className="font-mono text-on-surface-variant">{r.payout_account_number}</div>
+                        {r.payout_account_name && (
+                          <div className="text-on-surface-variant">{r.payout_account_name}</div>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-on-surface-variant">—</span>
+                    )}
+                  </td>
                   <td className="px-5 py-3 text-on-surface-variant">
                     {new Date(r.disbursed_at || r.created_at).toLocaleDateString()}
                   </td>
@@ -175,14 +192,14 @@ function LedgerPage() {
               ))}
               {!ledgerQuery.isLoading && rows.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="text-center py-10 text-on-surface-variant text-sm">
+                  <td colSpan={8} className="text-center py-10 text-on-surface-variant text-sm">
                     No records yet. Disbursals recorded by welfare officers will appear here.
                   </td>
                 </tr>
               )}
               {ledgerQuery.isLoading && (
                 <tr>
-                  <td colSpan={7} className="text-center py-10 text-on-surface-variant text-sm">
+                  <td colSpan={8} className="text-center py-10 text-on-surface-variant text-sm">
                     Loading…
                   </td>
                 </tr>

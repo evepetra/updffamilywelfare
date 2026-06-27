@@ -718,13 +718,14 @@ function AdminDashboard() {
                   <th className="text-left px-5 py-3 font-medium">Recipient</th>
                   <th className="text-left px-5 py-3 font-medium">Region</th>
                   <th className="text-left px-5 py-3 font-medium">Aid Type</th>
+                  <th className="text-left px-5 py-3 font-medium">Deposit Account</th>
                   <th className="text-right px-5 py-3 font-medium">Amount (UGX)</th>
                   <th className="text-left px-5 py-3 font-medium">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant">
                 {ledgerQuery.isLoading && (
-                  <tr><td colSpan={6} className="text-center py-8 text-on-surface-variant text-sm">Loading…</td></tr>
+                  <tr><td colSpan={7} className="text-center py-8 text-on-surface-variant text-sm">Loading…</td></tr>
                 )}
                 {(() => {
                   const fromTs = ledgerFromDate ? new Date(ledgerFromDate + "T00:00:00").getTime() : null;
@@ -738,7 +739,7 @@ function AdminDashboard() {
                   });
                   if (!ledgerQuery.isLoading && filtered.length === 0) {
                     return (
-                      <tr><td colSpan={6} className="text-center py-8 text-on-surface-variant text-sm">No disbursals match the current filters.</td></tr>
+                      <tr><td colSpan={7} className="text-center py-8 text-on-surface-variant text-sm">No disbursals match the current filters.</td></tr>
                     );
                   }
                   return filtered.slice(0, 50).map((l) => (
@@ -749,6 +750,19 @@ function AdminDashboard() {
                     <td className="px-5 py-3 font-medium">{l.recipient_name}</td>
                     <td className="px-5 py-3">{l.region}</td>
                     <td className="px-5 py-3">{l.aid_type}</td>
+                    <td className="px-5 py-3 text-xs">
+                      {l.payout_account_number ? (
+                        <>
+                          <div className="font-medium capitalize">
+                            {(l.payout_method === "mobile_money" ? "Mobile Money" : "Bank")}
+                            {l.payout_provider ? ` · ${l.payout_provider}` : ""}
+                          </div>
+                          <div className="font-mono text-on-surface-variant">{l.payout_account_number}</div>
+                        </>
+                      ) : (
+                        <span className="text-on-surface-variant">—</span>
+                      )}
+                    </td>
                     <td className="px-5 py-3 text-right font-mono">
                       {Number(l.amount || 0).toLocaleString("en-UG")}
                     </td>
@@ -831,6 +845,10 @@ function RecordDisbursalDialog({
   const [aidType, setAidType] = useState("Medical");
   const [amount, setAmount] = useState("");
   const [status, setStatus] = useState("disbursed");
+  const [payoutMethod, setPayoutMethod] = useState<"mobile_money" | "bank">("mobile_money");
+  const [payoutProvider, setPayoutProvider] = useState("MTN");
+  const [payoutAccountName, setPayoutAccountName] = useState("");
+  const [payoutAccountNumber, setPayoutAccountNumber] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -845,6 +863,10 @@ function RecordDisbursalDialog({
       amount: Number(amount) || 0,
       status,
       disbursed_at: status === "disbursed" ? new Date().toISOString() : null,
+      payout_method: payoutMethod,
+      payout_provider: payoutProvider.trim() || null,
+      payout_account_name: payoutAccountName.trim() || null,
+      payout_account_number: payoutAccountNumber.trim() || null,
     });
     setBusy(false);
     if (error) {
@@ -904,6 +926,37 @@ function RecordDisbursalDialog({
             <option value="approved">Approved</option>
             <option value="disbursed">Disbursed</option>
           </select>
+          <div className="pt-2 border-t border-outline-variant">
+            <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2">Deposit account</p>
+            <div className="grid grid-cols-2 gap-3">
+              <select
+                value={payoutMethod}
+                onChange={(e) => setPayoutMethod(e.target.value as "mobile_money" | "bank")}
+                className="px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+              >
+                <option value="mobile_money">Mobile Money</option>
+                <option value="bank">Bank</option>
+              </select>
+              <input
+                value={payoutProvider}
+                onChange={(e) => setPayoutProvider(e.target.value)}
+                placeholder={payoutMethod === "mobile_money" ? "Provider (MTN, Airtel…)" : "Bank name"}
+                className="px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+              />
+            </div>
+            <input
+              value={payoutAccountName}
+              onChange={(e) => setPayoutAccountName(e.target.value)}
+              placeholder="Account holder name"
+              className="mt-3 w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm"
+            />
+            <input
+              value={payoutAccountNumber}
+              onChange={(e) => setPayoutAccountNumber(e.target.value)}
+              placeholder={payoutMethod === "mobile_money" ? "Phone / wallet number (e.g. 0772123456)" : "Bank account number"}
+              className="mt-3 w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-md text-sm font-mono"
+            />
+          </div>
           {err && <p className="text-sm text-error">{err}</p>}
         </div>
         <div className="flex justify-end gap-2 mt-6">
@@ -911,7 +964,7 @@ function RecordDisbursalDialog({
             Cancel
           </button>
           <button
-            disabled={busy || !recipientName || !recipientUserId || !amount}
+            disabled={busy || !recipientName || !recipientUserId || !amount || !payoutAccountNumber}
             onClick={save}
             className="px-5 py-2.5 text-sm font-semibold bg-primary text-on-primary rounded-md hover:bg-primary-container disabled:opacity-50"
           >
