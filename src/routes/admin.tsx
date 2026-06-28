@@ -790,7 +790,7 @@ function AdminDashboard() {
                 const rows = ledger.filter((l) => {
                   if (ledgerStatusFilter !== "all" && l.status !== ledgerStatusFilter) return false;
                   if (serviceFilter !== "all") {
-                    const svc = serviceByUserId.get(l.recipient_user_id) ?? "";
+                    const svc = serviceByUserId.get(l.recipient_user_id ?? "") ?? "";
                     if (svc !== serviceFilter) return false;
                   }
                   const d = new Date(l.disbursed_at ?? l.created_at).getTime();
@@ -804,7 +804,7 @@ function AdminDashboard() {
                     date: l.disbursed_at ?? l.created_at,
                     recipient_name: l.recipient_name,
                     region: l.region,
-                    service: serviceByUserId.get(l.recipient_user_id) ?? "",
+                    service: serviceByUserId.get(l.recipient_user_id ?? "") ?? "",
                     aid_type: l.aid_type,
                     payout_method: l.payout_method,
                     payout_provider: l.payout_provider,
@@ -849,7 +849,7 @@ function AdminDashboard() {
                   const filtered = ledger.filter((l) => {
                     if (ledgerStatusFilter !== "all" && l.status !== ledgerStatusFilter) return false;
                     if (serviceFilter !== "all") {
-                      const svc = serviceByUserId.get(l.recipient_user_id) ?? "";
+                      const svc = serviceByUserId.get(l.recipient_user_id ?? "") ?? "";
                       if (svc !== serviceFilter) return false;
                     }
                     const d = new Date(l.disbursed_at ?? l.created_at).getTime();
@@ -871,7 +871,7 @@ function AdminDashboard() {
                     <td className="px-5 py-3">{l.region}</td>
                     <td className="px-5 py-3 text-xs">
                       {(() => {
-                        const svc = serviceByUserId.get(l.recipient_user_id);
+                        const svc = serviceByUserId.get(l.recipient_user_id ?? "");
                         return svc ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-fixed-dim text-primary font-medium">
                             <Icon name="military_tech" className="text-[12px]" />
