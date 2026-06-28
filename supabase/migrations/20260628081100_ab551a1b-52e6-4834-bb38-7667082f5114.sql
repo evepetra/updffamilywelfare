@@ -1,0 +1,1 @@
+ALTER TABLE public.aid_ledger ALTER COLUMN recipient_user_id DROP NOT NULL;
