@@ -144,6 +144,9 @@ function AdminDashboard() {
   const [ledgerToDate, setLedgerToDate] = useState("");
   const [ledgerStatusFilter, setLedgerStatusFilter] = useState<string>("all");
   const [serviceFilter, setServiceFilter] = useState<string>("all");
+  const [exportCols, setExportCols] = useState<string[]>(DEFAULT_EXPORT_COLS);
+  const [colsOpen, setColsOpen] = useState(false);
+  const activeCols = EXPORT_COLUMNS.filter((c) => exportCols.includes(c.key));
   const UPDF_SERVICES = ["Air Force", "SFC", "Land Force", "Reserve Force"] as const;
   // System Administrators may VIEW the Welfare Officer console for oversight,
   // but they cannot approve, reject, or disburse aid — only officers/admins
