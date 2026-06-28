@@ -8,9 +8,46 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { requireStaff } from "@/lib/auth/roles.functions";
 import {
-  buildDisbursementsCsv,
   downloadCsv,
+  toCsv,
 } from "@/lib/admin/service-filters";
+
+type LedgerRow = {
+  id: string;
+  recipient_name: string | null;
+  recipient_user_id: string | null;
+  region: string | null;
+  aid_type: string | null;
+  payout_method: string | null;
+  payout_provider: string | null;
+  payout_account_name: string | null;
+  payout_account_number: string | null;
+  amount: number | string | null;
+  status: string | null;
+  created_at: string;
+  disbursed_at: string | null;
+};
+
+type ExportColumn = {
+  key: string;
+  label: string;
+  value: (l: LedgerRow, service: string) => string;
+  align?: "left" | "right";
+};
+
+const EXPORT_COLUMNS: ExportColumn[] = [
+  { key: "date", label: "Date", value: (l) => new Date(l.disbursed_at ?? l.created_at).toLocaleDateString() },
+  { key: "recipient", label: "Recipient", value: (l) => l.recipient_name ?? "" },
+  { key: "service", label: "UPDF Service", value: (_l, s) => s },
+  { key: "region", label: "Region", value: (l) => l.region ?? "" },
+  { key: "aid_type", label: "Aid Type", value: (l) => l.aid_type ?? "" },
+  { key: "method", label: "Method", value: (l) => `${l.payout_method ?? ""}${l.payout_provider ? ` (${l.payout_provider})` : ""}` },
+  { key: "account_name", label: "Account Name", value: (l) => l.payout_account_name ?? "" },
+  { key: "account_number", label: "Account Number", value: (l) => l.payout_account_number ?? "" },
+  { key: "amount", label: "Amount (UGX)", value: (l) => Number(l.amount || 0).toLocaleString(), align: "right" },
+  { key: "status", label: "Status", value: (l) => l.status ?? "" },
+];
+const DEFAULT_EXPORT_COLS = EXPORT_COLUMNS.map((c) => c.key);
 
 function DocsCell({ requestId }: { requestId: string }) {
   const { data, isLoading } = useQuery({
