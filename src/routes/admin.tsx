@@ -822,6 +822,64 @@ function AdminDashboard() {
                 Clear filters
               </button>
             )}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setColsOpen((v) => !v)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-outline-variant hover:bg-surface-container"
+                title="Choose which columns to include in CSV/PDF exports"
+              >
+                <Icon name="view_column" className="text-[14px]" />
+                Columns ({activeCols.length}/{EXPORT_COLUMNS.length})
+                <Icon name="expand_more" className="text-[14px]" />
+              </button>
+              {colsOpen && (
+                <div className="absolute right-0 z-20 mt-1 w-64 bg-card border border-outline-variant rounded-md shadow-lg p-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-medium">
+                    <span className="text-on-surface-variant">Export columns</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="text-primary hover:underline"
+                        onClick={() => setExportCols(DEFAULT_EXPORT_COLS)}
+                      >
+                        All
+                      </button>
+                      <button
+                        type="button"
+                        className="text-on-surface-variant hover:underline"
+                        onClick={() => setExportCols([])}
+                      >
+                        None
+                      </button>
+                    </div>
+                  </div>
+                  <ul className="max-h-64 overflow-y-auto space-y-1.5">
+                    {EXPORT_COLUMNS.map((c) => {
+                      const checked = exportCols.includes(c.key);
+                      return (
+                        <li key={c.key}>
+                          <label className="flex items-center gap-2 text-sm cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) =>
+                                setExportCols((prev) =>
+                                  e.target.checked
+                                    ? [...DEFAULT_EXPORT_COLS.filter((k) => prev.includes(k) || k === c.key)]
+                                    : prev.filter((k) => k !== c.key),
+                                )
+                              }
+                            />
+                            <span>{c.label}</span>
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => {
