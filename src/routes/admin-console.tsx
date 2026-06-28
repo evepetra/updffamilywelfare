@@ -702,19 +702,22 @@ function AdminConsole() {
                   <th className="text-center px-3 py-3 font-medium">Officer</th>
                   <th className="text-center px-3 py-3 font-medium">Soldier</th>
                   <th className="text-center px-3 py-3 font-medium">Family</th>
+                  {canDeleteUsers && (
+                    <th className="text-center px-3 py-3 font-medium">Delete</th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant">
                 {usersQuery.isLoading && (
-                  <tr><td colSpan={9} className="text-center py-8 text-on-surface-variant">Loading users…</td></tr>
+                  <tr><td colSpan={canDeleteUsers ? 10 : 9} className="text-center py-8 text-on-surface-variant">Loading users…</td></tr>
                 )}
                 {usersQuery.error && !usersQuery.isLoading && (
-                  <tr><td colSpan={9} className="text-center py-8 text-error">
+                  <tr><td colSpan={canDeleteUsers ? 10 : 9} className="text-center py-8 text-error">
                     {(usersQuery.error as Error).message}
                   </td></tr>
                 )}
                 {!usersQuery.isLoading && filtered.length === 0 && (
-                  <tr><td colSpan={9} className="text-center py-8 text-on-surface-variant">No users match.</td></tr>
+                  <tr><td colSpan={canDeleteUsers ? 10 : 9} className="text-center py-8 text-on-surface-variant">No users match.</td></tr>
                 )}
                 {filtered.map((u) => {
                   const userRoles = u.roles ?? [];
@@ -766,6 +769,24 @@ function AdminConsole() {
                           </td>
                         );
                       })}
+                      {canDeleteUsers && (
+                        <td className="px-3 py-3 text-center">
+                          <button
+                            type="button"
+                            disabled={deletingId === u.id || u.id === auth.user?.id}
+                            onClick={() => removeUser(u)}
+                            title={
+                              u.id === auth.user?.id
+                                ? "You cannot delete your own account"
+                                : "Permanently delete this user"
+                            }
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold border border-error text-error hover:bg-error hover:text-on-error disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            <Icon name="delete" className="text-[14px]" />
+                            {deletingId === u.id ? "…" : "Delete"}
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
