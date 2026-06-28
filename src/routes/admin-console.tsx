@@ -404,6 +404,36 @@ function AdminConsole() {
     }
   }
 
+  async function removeUser(u: AdminUserRow) {
+    if (!canDeleteUsers) return;
+    if (u.id === auth.user?.id) {
+      setActionError("You cannot delete your own account.");
+      return;
+    }
+    const label = u.email || u.full_name || u.id;
+    const confirmText = window.prompt(
+      `PERMANENTLY DELETE ${label}?\n\nThis removes the user, their profile, roles and history. This cannot be undone.\n\nType DELETE to confirm:`,
+      "",
+    );
+    if (confirmText !== "DELETE") return;
+    setDeletingId(u.id);
+    setActionError(null);
+    try {
+      await deleteUser({ data: { userId: u.id } });
+      setSelected((prev) => {
+        const next = new Set(prev);
+        next.delete(u.id);
+        return next;
+      });
+      await qc.invalidateQueries({ queryKey: ["admin-users-list"] });
+      await qc.invalidateQueries({ queryKey: ["admin-role-audit"] });
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Delete failed");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return (
     <AppShell
       title="Administrator Console"
