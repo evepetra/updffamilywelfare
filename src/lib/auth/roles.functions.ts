@@ -77,6 +77,38 @@ export const requireSystemAdmin = createServerFn({ method: "GET" })
     return { userId: context.userId, authorized: Boolean(data) };
   });
 
+/**
+ * System-admin-only: permanently delete a user from auth.users.
+ * Cascades to public.profiles, public.user_roles, etc. via ON DELETE CASCADE.
+ * Callers are blocked from deleting themselves.
+ */
+export const deleteUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { userId: string }) => {
+    if (!input?.userId || typeof input.userId !== "string") {
+      throw new Error("userId is required");
+    }
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    if (data.userId === context.userId) {
+      throw new Error("You cannot delete your own account.");
+    }
+    const { data: rolesData, error: rErr } = await context.supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .eq("role", "system_admin")
+      .maybeSingle();
+    if (rErr) throw new Error(rErr.message);
+    if (!rolesData) throw new Error("Forbidden: system administrator access required");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error: delErr } = await supabaseAdmin.auth.admin.deleteUser(data.userId);
+    if (delErr) throw new Error(delErr.message);
+    return { ok: true, userId: data.userId };
+  });
+
 export type AdminUserRow = {
   id: string;
   email: string | null;
