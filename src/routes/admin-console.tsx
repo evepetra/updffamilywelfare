@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
 import { supabase } from "@/integrations/supabase/client";
-import { adminListUsers, requireAdmin } from "@/lib/auth/roles.functions";
+import { adminListUsers, deleteUser, requireAdmin } from "@/lib/auth/roles.functions";
 import { useAuth } from "@/hooks/use-auth";
 import {
   buildMembersCsv,
@@ -82,6 +82,8 @@ function AdminConsole() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const canDeleteUsers = auth.isSystemAdmin;
   const [auditUserFilter, setAuditUserFilter] = useState("");
   const [auditRoleFilter, setAuditRoleFilter] = useState<"all" | AppRole>("all");
   const [auditPage, setAuditPage] = useState(0);
