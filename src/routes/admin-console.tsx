@@ -404,7 +404,7 @@ function AdminConsole() {
     }
   }
 
-  async function removeUser(u: AdminUserRow) {
+  async function removeUser(u: { id: string; email: string | null; full_name: string | null }) {
     if (!canDeleteUsers) return;
     if (u.id === auth.user?.id) {
       setActionError("You cannot delete your own account.");
