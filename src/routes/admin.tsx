@@ -890,28 +890,29 @@ function AdminDashboard() {
                 doc.text(filterLine, 40, 58);
                 const totalAmt = rows.reduce((s, l) => s + Number(l.amount || 0), 0);
                 doc.text(`Records: ${rows.length}   Total: UGX ${totalAmt.toLocaleString()}`, 40, 74);
+                if (activeCols.length === 0) {
+                  alert("Select at least one column to export.");
+                  return;
+                }
                 autoTable(doc, {
                   startY: 90,
                   styles: { fontSize: 8, cellPadding: 4 },
                   headStyles: { fillColor: [30, 64, 124] },
-                  head: [["Date", "Recipient", "Service", "Region", "Aid Type", "Method", "Account", "Amount (UGX)", "Status"]],
-                  body: rows.map((l) => [
-                    new Date(l.disbursed_at ?? l.created_at).toLocaleDateString(),
-                    l.recipient_name ?? "",
-                    serviceByUserId.get(l.recipient_user_id ?? "") ?? "",
-                    l.region ?? "",
-                    l.aid_type ?? "",
-                    `${l.payout_method ?? ""}${l.payout_provider ? ` (${l.payout_provider})` : ""}`,
-                    `${l.payout_account_name ?? ""}${l.payout_account_number ? ` — ${l.payout_account_number}` : ""}`,
-                    Number(l.amount || 0).toLocaleString(),
-                    l.status ?? "",
-                  ]),
+                  head: [activeCols.map((c) => c.label)],
+                  body: rows.map((l) => {
+                    const svc = serviceByUserId.get(l.recipient_user_id ?? "") ?? "";
+                    return activeCols.map((c) => c.value(l as LedgerRow, svc));
+                  }),
+                  columnStyles: activeCols.reduce((acc, c, i) => {
+                    if (c.align === "right") acc[i] = { halign: "right" };
+                    return acc;
+                  }, {} as Record<number, { halign: "right" | "left" }>),
                 });
                 const ts = new Date().toISOString().replace(/[:.]/g, "-");
                 doc.save(`disbursed-aid-${ts}.pdf`);
               }}
-              disabled={ledger.length === 0}
-              title="Export filtered disbursements to PDF"
+              disabled={ledger.length === 0 || activeCols.length === 0}
+              title="Export filtered disbursements to PDF (selected columns)"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md border border-primary text-primary hover:bg-primary hover:text-on-primary disabled:opacity-40"
             >
               <Icon name="picture_as_pdf" className="text-[14px]" />
