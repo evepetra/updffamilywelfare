@@ -8,9 +8,46 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { requireStaff } from "@/lib/auth/roles.functions";
 import {
-  buildDisbursementsCsv,
   downloadCsv,
+  toCsv,
 } from "@/lib/admin/service-filters";
+
+type LedgerRow = {
+  id: string;
+  recipient_name: string | null;
+  recipient_user_id: string | null;
+  region: string | null;
+  aid_type: string | null;
+  payout_method: string | null;
+  payout_provider: string | null;
+  payout_account_name: string | null;
+  payout_account_number: string | null;
+  amount: number | string | null;
+  status: string | null;
+  created_at: string;
+  disbursed_at: string | null;
+};
+
+type ExportColumn = {
+  key: string;
+  label: string;
+  value: (l: LedgerRow, service: string) => string;
+  align?: "left" | "right";
+};
+
+const EXPORT_COLUMNS: ExportColumn[] = [
+  { key: "date", label: "Date", value: (l) => new Date(l.disbursed_at ?? l.created_at).toLocaleDateString() },
+  { key: "recipient", label: "Recipient", value: (l) => l.recipient_name ?? "" },
+  { key: "service", label: "UPDF Service", value: (_l, s) => s },
+  { key: "region", label: "Region", value: (l) => l.region ?? "" },
+  { key: "aid_type", label: "Aid Type", value: (l) => l.aid_type ?? "" },
+  { key: "method", label: "Method", value: (l) => `${l.payout_method ?? ""}${l.payout_provider ? ` (${l.payout_provider})` : ""}` },
+  { key: "account_name", label: "Account Name", value: (l) => l.payout_account_name ?? "" },
+  { key: "account_number", label: "Account Number", value: (l) => l.payout_account_number ?? "" },
+  { key: "amount", label: "Amount (UGX)", value: (l) => Number(l.amount || 0).toLocaleString(), align: "right" },
+  { key: "status", label: "Status", value: (l) => l.status ?? "" },
+];
+const DEFAULT_EXPORT_COLS = EXPORT_COLUMNS.map((c) => c.key);
 
 function DocsCell({ requestId }: { requestId: string }) {
   const { data, isLoading } = useQuery({
@@ -107,6 +144,9 @@ function AdminDashboard() {
   const [ledgerToDate, setLedgerToDate] = useState("");
   const [ledgerStatusFilter, setLedgerStatusFilter] = useState<string>("all");
   const [serviceFilter, setServiceFilter] = useState<string>("all");
+  const [exportCols, setExportCols] = useState<string[]>(DEFAULT_EXPORT_COLS);
+  const [colsOpen, setColsOpen] = useState(false);
+  const activeCols = EXPORT_COLUMNS.filter((c) => exportCols.includes(c.key));
   const UPDF_SERVICES = ["Air Force", "SFC", "Land Force", "Reserve Force"] as const;
   // System Administrators may VIEW the Welfare Officer console for oversight,
   // but they cannot approve, reject, or disburse aid — only officers/admins
@@ -782,6 +822,64 @@ function AdminDashboard() {
                 Clear filters
               </button>
             )}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setColsOpen((v) => !v)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-outline-variant hover:bg-surface-container"
+                title="Choose which columns to include in CSV/PDF exports"
+              >
+                <Icon name="view_column" className="text-[14px]" />
+                Columns ({activeCols.length}/{EXPORT_COLUMNS.length})
+                <Icon name="expand_more" className="text-[14px]" />
+              </button>
+              {colsOpen && (
+                <div className="absolute right-0 z-20 mt-1 w-64 bg-card border border-outline-variant rounded-md shadow-lg p-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-medium">
+                    <span className="text-on-surface-variant">Export columns</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="text-primary hover:underline"
+                        onClick={() => setExportCols(DEFAULT_EXPORT_COLS)}
+                      >
+                        All
+                      </button>
+                      <button
+                        type="button"
+                        className="text-on-surface-variant hover:underline"
+                        onClick={() => setExportCols([])}
+                      >
+                        None
+                      </button>
+                    </div>
+                  </div>
+                  <ul className="max-h-64 overflow-y-auto space-y-1.5">
+                    {EXPORT_COLUMNS.map((c) => {
+                      const checked = exportCols.includes(c.key);
+                      return (
+                        <li key={c.key}>
+                          <label className="flex items-center gap-2 text-sm cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) =>
+                                setExportCols((prev) =>
+                                  e.target.checked
+                                    ? [...DEFAULT_EXPORT_COLS.filter((k) => prev.includes(k) || k === c.key)]
+                                    : prev.filter((k) => k !== c.key),
+                                )
+                              }
+                            />
+                            <span>{c.label}</span>
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => {
@@ -798,27 +896,21 @@ function AdminDashboard() {
                   if (toTs !== null && d > toTs) return false;
                   return true;
                 });
-                const csv = buildDisbursementsCsv(
-                  rows.map((l) => ({
-                    id: l.id,
-                    date: l.disbursed_at ?? l.created_at,
-                    recipient_name: l.recipient_name,
-                    region: l.region,
-                    service: serviceByUserId.get(l.recipient_user_id ?? "") ?? "",
-                    aid_type: l.aid_type,
-                    payout_method: l.payout_method,
-                    payout_provider: l.payout_provider,
-                    payout_account_name: l.payout_account_name,
-                    payout_account_number: l.payout_account_number,
-                    amount: l.amount,
-                    status: l.status,
-                  })),
-                );
+                if (activeCols.length === 0) {
+                  alert("Select at least one column to export.");
+                  return;
+                }
+                const header = activeCols.map((c) => c.label);
+                const body = rows.map((l) => {
+                  const svc = serviceByUserId.get(l.recipient_user_id ?? "") ?? "";
+                  return activeCols.map((c) => c.value(l as LedgerRow, svc));
+                });
+                const csv = toCsv(header, body);
                 const ts = new Date().toISOString().replace(/[:.]/g, "-");
                 downloadCsv(`disbursed-aid-${ts}.csv`, csv);
               }}
-              disabled={ledger.length === 0}
-              title="Export filtered disbursements to CSV (includes UPDF Service)"
+              disabled={ledger.length === 0 || activeCols.length === 0}
+              title="Export filtered disbursements to CSV (selected columns)"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md border border-primary text-primary hover:bg-primary hover:text-on-primary disabled:opacity-40"
             >
               <Icon name="download" className="text-[14px]" />
@@ -856,28 +948,29 @@ function AdminDashboard() {
                 doc.text(filterLine, 40, 58);
                 const totalAmt = rows.reduce((s, l) => s + Number(l.amount || 0), 0);
                 doc.text(`Records: ${rows.length}   Total: UGX ${totalAmt.toLocaleString()}`, 40, 74);
+                if (activeCols.length === 0) {
+                  alert("Select at least one column to export.");
+                  return;
+                }
                 autoTable(doc, {
                   startY: 90,
                   styles: { fontSize: 8, cellPadding: 4 },
                   headStyles: { fillColor: [30, 64, 124] },
-                  head: [["Date", "Recipient", "Service", "Region", "Aid Type", "Method", "Account", "Amount (UGX)", "Status"]],
-                  body: rows.map((l) => [
-                    new Date(l.disbursed_at ?? l.created_at).toLocaleDateString(),
-                    l.recipient_name ?? "",
-                    serviceByUserId.get(l.recipient_user_id ?? "") ?? "",
-                    l.region ?? "",
-                    l.aid_type ?? "",
-                    `${l.payout_method ?? ""}${l.payout_provider ? ` (${l.payout_provider})` : ""}`,
-                    `${l.payout_account_name ?? ""}${l.payout_account_number ? ` — ${l.payout_account_number}` : ""}`,
-                    Number(l.amount || 0).toLocaleString(),
-                    l.status ?? "",
-                  ]),
+                  head: [activeCols.map((c) => c.label)],
+                  body: rows.map((l) => {
+                    const svc = serviceByUserId.get(l.recipient_user_id ?? "") ?? "";
+                    return activeCols.map((c) => c.value(l as LedgerRow, svc));
+                  }),
+                  columnStyles: activeCols.reduce((acc, c, i) => {
+                    if (c.align === "right") acc[i] = { halign: "right" };
+                    return acc;
+                  }, {} as Record<number, { halign: "right" | "left" }>),
                 });
                 const ts = new Date().toISOString().replace(/[:.]/g, "-");
                 doc.save(`disbursed-aid-${ts}.pdf`);
               }}
-              disabled={ledger.length === 0}
-              title="Export filtered disbursements to PDF"
+              disabled={ledger.length === 0 || activeCols.length === 0}
+              title="Export filtered disbursements to PDF (selected columns)"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md border border-primary text-primary hover:bg-primary hover:text-on-primary disabled:opacity-40"
             >
               <Icon name="picture_as_pdf" className="text-[14px]" />
