@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
 import { supabase } from "@/integrations/supabase/client";
-import { adminListUsers, requireAdmin } from "@/lib/auth/roles.functions";
+import { adminListUsers, deleteUser, requireAdmin } from "@/lib/auth/roles.functions";
 import { useAuth } from "@/hooks/use-auth";
 import {
   buildMembersCsv,
@@ -82,6 +82,8 @@ function AdminConsole() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const canDeleteUsers = auth.isSystemAdmin;
   const [auditUserFilter, setAuditUserFilter] = useState("");
   const [auditRoleFilter, setAuditRoleFilter] = useState<"all" | AppRole>("all");
   const [auditPage, setAuditPage] = useState(0);
@@ -402,6 +404,36 @@ function AdminConsole() {
     }
   }
 
+  async function removeUser(u: { id: string; email: string | null; full_name: string | null }) {
+    if (!canDeleteUsers) return;
+    if (u.id === auth.user?.id) {
+      setActionError("You cannot delete your own account.");
+      return;
+    }
+    const label = u.email || u.full_name || u.id;
+    const confirmText = window.prompt(
+      `PERMANENTLY DELETE ${label}?\n\nThis removes the user, their profile, roles and history. This cannot be undone.\n\nType DELETE to confirm:`,
+      "",
+    );
+    if (confirmText !== "DELETE") return;
+    setDeletingId(u.id);
+    setActionError(null);
+    try {
+      await deleteUser({ data: { userId: u.id } });
+      setSelected((prev) => {
+        const next = new Set(prev);
+        next.delete(u.id);
+        return next;
+      });
+      await qc.invalidateQueries({ queryKey: ["admin-users-list"] });
+      await qc.invalidateQueries({ queryKey: ["admin-role-audit"] });
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Delete failed");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return (
     <AppShell
       title="Administrator Console"
@@ -670,19 +702,22 @@ function AdminConsole() {
                   <th className="text-center px-3 py-3 font-medium">Officer</th>
                   <th className="text-center px-3 py-3 font-medium">Soldier</th>
                   <th className="text-center px-3 py-3 font-medium">Family</th>
+                  {canDeleteUsers && (
+                    <th className="text-center px-3 py-3 font-medium">Delete</th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant">
                 {usersQuery.isLoading && (
-                  <tr><td colSpan={9} className="text-center py-8 text-on-surface-variant">Loading users…</td></tr>
+                  <tr><td colSpan={canDeleteUsers ? 10 : 9} className="text-center py-8 text-on-surface-variant">Loading users…</td></tr>
                 )}
                 {usersQuery.error && !usersQuery.isLoading && (
-                  <tr><td colSpan={9} className="text-center py-8 text-error">
+                  <tr><td colSpan={canDeleteUsers ? 10 : 9} className="text-center py-8 text-error">
                     {(usersQuery.error as Error).message}
                   </td></tr>
                 )}
                 {!usersQuery.isLoading && filtered.length === 0 && (
-                  <tr><td colSpan={9} className="text-center py-8 text-on-surface-variant">No users match.</td></tr>
+                  <tr><td colSpan={canDeleteUsers ? 10 : 9} className="text-center py-8 text-on-surface-variant">No users match.</td></tr>
                 )}
                 {filtered.map((u) => {
                   const userRoles = u.roles ?? [];
@@ -734,6 +769,24 @@ function AdminConsole() {
                           </td>
                         );
                       })}
+                      {canDeleteUsers && (
+                        <td className="px-3 py-3 text-center">
+                          <button
+                            type="button"
+                            disabled={deletingId === u.id || u.id === auth.user?.id}
+                            onClick={() => removeUser(u)}
+                            title={
+                              u.id === auth.user?.id
+                                ? "You cannot delete your own account"
+                                : "Permanently delete this user"
+                            }
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold border border-error text-error hover:bg-error hover:text-on-error disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            <Icon name="delete" className="text-[14px]" />
+                            {deletingId === u.id ? "…" : "Delete"}
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
