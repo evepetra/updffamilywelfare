@@ -28,7 +28,7 @@ export type Database = {
           payout_provider: string | null
           reason: string | null
           recipient_name: string
-          recipient_user_id: string
+          recipient_user_id: string | null
           region: string
           request_id: string | null
           status: string
@@ -47,7 +47,7 @@ export type Database = {
           payout_provider?: string | null
           reason?: string | null
           recipient_name: string
-          recipient_user_id: string
+          recipient_user_id?: string | null
           region: string
           request_id?: string | null
           status?: string
@@ -66,7 +66,7 @@ export type Database = {
           payout_provider?: string | null
           reason?: string | null
           recipient_name?: string
-          recipient_user_id?: string
+          recipient_user_id?: string | null
           region?: string
           request_id?: string | null
           status?: string
