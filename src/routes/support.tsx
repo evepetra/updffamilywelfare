@@ -73,6 +73,26 @@ function SupportPage() {
   const [soldierBranch, setSoldierBranch] = useState<string>("");
   const [contactInfo, setContactInfo] = useState<string>("");
 
+  // Prefill soldier-relationship fields from the family member's saved
+  // "Soldier Relationship Details" on their dashboard. Only fill empty fields
+  // so a user mid-edit isn't overwritten. Re-runs once profile resolves.
+  const prefilledFromProfile = useRef(false);
+  useEffect(() => {
+    if (prefilledFromProfile.current) return;
+    if (beneficiary !== "family" || !profile || isSoldier) return;
+    if (profile.relationship_to_soldier && !relationship)
+      setRelationship(profile.relationship_to_soldier);
+    if (profile.related_soldier_full_name && !soldierFullName)
+      setSoldierFullName(profile.related_soldier_full_name);
+    if (profile.related_soldier_service_number && !soldierServiceNumber)
+      setSoldierServiceNumber(profile.related_soldier_service_number);
+    if (profile.related_soldier_rank && !soldierRank)
+      setSoldierRank(profile.related_soldier_rank);
+    if (profile.related_soldier_service && !soldierBranch)
+      setSoldierBranch(profile.related_soldier_service);
+    prefilledFromProfile.current = true;
+  }, [profile, beneficiary, isSoldier, relationship, soldierFullName, soldierServiceNumber, soldierRank, soldierBranch]);
+
   // Family-member (beneficiary) details (used when beneficiary === "family").
   const [familyFullName, setFamilyFullName] = useState<string>("");
   const [familyPhone, setFamilyPhone] = useState<string>("");

@@ -17,6 +17,11 @@ export interface AuthState {
     region: string | null;
     nin: string | null;
     created_at: string | null;
+    relationship_to_soldier: string | null;
+    related_soldier_full_name: string | null;
+    related_soldier_service_number: string | null;
+    related_soldier_rank: string | null;
+    related_soldier_service: string | null;
   } | null;
   roles: Role[];
   isFamily: boolean;
@@ -43,7 +48,7 @@ export function useAuth(redirectIfUnauthed = true): AuthState {
       const [{ data: prof }, { data: rs }] = await Promise.all([
         supabase
           .from("profiles")
-        .select("full_name, service_number, service, rank, region, nin, created_at")
+        .select("full_name, service_number, service, rank, region, nin, created_at, relationship_to_soldier, related_soldier_full_name, related_soldier_service_number, related_soldier_rank, related_soldier_service")
           .eq("id", uid)
           .maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", uid),
