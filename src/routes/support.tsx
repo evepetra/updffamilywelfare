@@ -561,9 +561,6 @@ function SupportPage() {
                         {soldierLookupStatus === "found" && (
                           <span className="text-primary">✓ Soldier found and details auto-filled.</span>
                         )}
-                        {soldierLookupStatus === "not_found" && (
-                          <span className="text-error">Soldier not found.</span>
-                        )}
                         {soldierLookupStatus === "error" && (
                           <span className="text-error">Lookup failed — try again.</span>
                         )}
