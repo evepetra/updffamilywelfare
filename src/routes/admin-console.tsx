@@ -84,6 +84,9 @@ function AdminConsole() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const canDeleteUsers = auth.isSystemAdmin;
+  // Only System Administrators may grant or revoke roles. Administrators have
+  // oversight (read-only) of role assignments; backend RLS enforces this too.
+  const canManageRoles = auth.isSystemAdmin;
   const [auditUserFilter, setAuditUserFilter] = useState("");
   const [auditRoleFilter, setAuditRoleFilter] = useState<"all" | AppRole>("all");
   const [auditPage, setAuditPage] = useState(0);
@@ -597,7 +600,9 @@ function AdminConsole() {
             <div>
               <h2 className="text-lg font-semibold text-primary">Role Assignment Toolkit</h2>
               <p className="text-xs text-on-surface-variant">
-                Toggle Admin, Welfare Officer, or Family on any account. Users can hold multiple roles.
+                {canManageRoles
+                  ? "Toggle Sys Admin, Admin, Welfare Officer, Soldier, or Family on any account. Users can hold multiple roles."
+                  : "Read-only view. Only System Administrators can grant or revoke roles."}
               </p>
             </div>
             <input
@@ -630,7 +635,7 @@ function AdminConsole() {
             </button>
           </div>
 
-          {selected.size > 0 && (
+          {canManageRoles && selected.size > 0 && (
             <div className="px-5 py-3 bg-primary-fixed-dim/40 border-b border-outline-variant flex flex-wrap items-center gap-2 text-xs">
               <span className="font-semibold text-primary mr-2">
                 {selected.size} selected
@@ -753,19 +758,33 @@ function AdminConsole() {
                         const key = `${u.id}:${role}`;
                         return (
                           <td key={role} className="px-3 py-3 text-center">
-                            <button
-                              disabled={busyKey === key}
-                              onClick={() => toggleRole(u.id, role, has)}
-                              className={
-                                "px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors " +
-                                (has
-                                  ? "bg-primary text-on-primary border-primary hover:bg-primary-container"
-                                  : "bg-surface-container-low text-on-surface-variant border-outline-variant hover:border-primary/40")
-                              }
-                              title={has ? `Revoke ${role}` : `Assign ${role}`}
-                            >
-                              {busyKey === key ? "…" : has ? "Granted" : "Assign"}
-                            </button>
+                            {canManageRoles ? (
+                              <button
+                                disabled={busyKey === key}
+                                onClick={() => toggleRole(u.id, role, has)}
+                                className={
+                                  "px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors " +
+                                  (has
+                                    ? "bg-primary text-on-primary border-primary hover:bg-primary-container"
+                                    : "bg-surface-container-low text-on-surface-variant border-outline-variant hover:border-primary/40")
+                                }
+                                title={has ? `Revoke ${role}` : `Assign ${role}`}
+                              >
+                                {busyKey === key ? "…" : has ? "Granted" : "Assign"}
+                              </button>
+                            ) : (
+                              <span
+                                title="Only System Administrators can change roles"
+                                className={
+                                  "inline-flex items-center justify-center px-3 py-1.5 rounded-md text-xs font-semibold border " +
+                                  (has
+                                    ? "bg-primary-fixed-dim text-primary border-primary/30"
+                                    : "bg-surface-container-low text-on-surface-variant border-outline-variant opacity-60")
+                                }
+                              >
+                                {has ? "Granted" : "—"}
+                              </span>
+                            )}
                           </td>
                         );
                       })}
